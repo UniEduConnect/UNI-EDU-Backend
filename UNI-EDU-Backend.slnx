@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="UNI-EDU-Backend.API/UNI-EDU-Backend.API.csproj" />
+  <Project Path="UNI-EDU-Backend.Application/UNI-EDU-Backend.Application.csproj" />
+  <Project Path="UNI-EDU-Backend.Domain/UNI-EDU-Backend.Domain.csproj" />
+  <Project Path="UNI-EDU-Backend.Infrastructure/UNI-EDU-Backend.Infrastructure.csproj" />
+</Solution>

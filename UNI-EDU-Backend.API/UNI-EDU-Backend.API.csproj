@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UNI_EDU_Backend.API</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DotNetEnv" Version="3.2.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UNI-EDU-Backend.Application\UNI-EDU-Backend.Application.csproj" />
+    <ProjectReference Include="..\UNI-EDU-Backend.Domain\UNI-EDU-Backend.Domain.csproj" />
+    <ProjectReference Include="..\UNI-EDU-Backend.Infrastructure\UNI-EDU-Backend.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
