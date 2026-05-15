@@ -1,0 +1,12 @@
+# .coderabbit.yaml
+reviews:
+  auto_review:
+    enabled: true
+    base_branches:
+      - main
+      - dev
+    auto_incremental_review: true  # Review on each push
+    drafts: false  # Don't review draft PRs
+  high_level_summary: true  # Generate summary in PR description
+  poem: true  # Include a poem in the walkthrough
+  changed_files_summary: true  # Show changed files summary
