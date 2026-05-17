@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using UNI_EDU_Backend.Domain;
+using UNI_EDU_Backend.Domain.Models;
 using UNI_EDU_Backend.Infrastructure;
 
 namespace UNI_EDU_Backend.API.Controllers;
