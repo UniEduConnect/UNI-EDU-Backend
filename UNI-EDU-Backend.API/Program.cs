@@ -17,6 +17,7 @@ builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
 
 Env.Load("../.env");
+builder.Configuration.AddEnvironmentVariables();
 var db = Env.GetString("POSTGRES_DB");
 var user = Env.GetString("POSTGRES_USER");
 var pass = Env.GetString("POSTGRES_PASSWORD");
@@ -40,7 +41,7 @@ builder.Services.AddCors(options =>
             .AllowCredentials());
 });
 
-var secretKey = Env.GetString("JWT_SECRET_KEY") ?? builder.Configuration["Jwt:SecretKey"];
+var secretKey = builder.Configuration["Jwt:SecretKey"];
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

@@ -1,6 +1,5 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -47,8 +46,8 @@ namespace UNI_EDU_Backend.Application.Services
                 throw new System.UnauthorizedAccessException();
             }
 
-            var password = new PasswordHasher<User>().VerifyHashedPassword(user, user.HashedPassword, loginRequest.Password);
-            if (password == PasswordVerificationResult.Failed)
+            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(loginRequest.Password, user.HashedPassword); 
+            if (!isPasswordValid)
             {
                 throw new System.UnauthorizedAccessException();
             }
@@ -69,17 +68,21 @@ namespace UNI_EDU_Backend.Application.Services
         {
             var jwtTokenHandler = new JwtSecurityTokenHandler();
             var secretKeyByte = Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"]);
+
+            var jwtId = Guid.NewGuid().ToString();
+
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.Role.ToString())
+                new Claim(ClaimTypes.Role, user.Role.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, jwtId)
             };
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
                 Expires = DateTime.UtcNow.AddHours(1),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(secretKeyByte), SecurityAlgorithms.HmacSha256Signature)
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(secretKeyByte), SecurityAlgorithms.HmacSha256)
             };
             var token = jwtTokenHandler.CreateToken(tokenDescriptor);
             var accessTokenString = jwtTokenHandler.WriteToken(token);
