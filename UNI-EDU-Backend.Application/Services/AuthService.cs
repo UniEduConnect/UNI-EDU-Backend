@@ -17,6 +17,7 @@ namespace UNI_EDU_Backend.Application.Services
     public class AuthService : IAuthService
     {
         private readonly IAuthRepository _authRepository;
+        private readonly IStudentRepository _studentRepository;
         private readonly IGenericRepository<RefreshToken> _genericRepository;
         private readonly IMapper _autoMapper;
         private readonly IUnitOfWork _unitOfWork;
@@ -25,6 +26,7 @@ namespace UNI_EDU_Backend.Application.Services
 
         public AuthService(
             IAuthRepository authRepository,
+            IStudentRepository studentRepository,
             IMapper autoMapper,
             IGenericRepository<RefreshToken> genericRepository,
             IUnitOfWork unitOfWork,
@@ -32,6 +34,7 @@ namespace UNI_EDU_Backend.Application.Services
             IHttpContextAccessor httpContext)
         {
             this._authRepository = authRepository;
+            this._studentRepository = studentRepository;
             this._genericRepository = genericRepository;
             this._autoMapper = autoMapper;
             this._unitOfWork = unitOfWork;
@@ -54,9 +57,29 @@ namespace UNI_EDU_Backend.Application.Services
             return await GenerateToken(user);
         }
 
-        public Task<User> RegisterStudentAsync(StudentRegister registerDto)
+        public async Task<bool> RegisterStudentAsync(StudentRegister registerDto)
         {
-            throw new NotImplementedException();
+            var existedUser = await _authRepository.IsPhonenumberOrEmailTakenAsync(registerDto.PhoneNumber, registerDto.Email);
+            if (existedUser)
+            {
+                throw new System.InvalidOperationException("Phone number or email is already taken.");
+            }
+
+            var userEntity = _autoMapper.Map<User>(registerDto);
+            userEntity.UserID = Guid.NewGuid();
+            userEntity.HashedPassword = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
+
+            var student = _autoMapper.Map<Student>(registerDto);
+            student.StudentID = userEntity.UserID;
+
+            student.User = userEntity;
+
+            await _authRepository.AddAsync(userEntity);
+            await _studentRepository.AddAsync(student);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            return true;
         }
 
         public Task<User> RegisterTutorAsync(TutorRegister registerDto)
