@@ -1,11 +1,20 @@
 using DotNetEnv;
+using FluentValidation;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.API.Middleware;
+using UNI_EDU_Backend.Application.Behaviors;
+using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Services.Users;
 using UNI_EDU_Backend.Infrastructure;
+using UNI_EDU_Backend.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 Env.Load("../.env");
 var db = Env.GetString("POSTGRES_DB");
@@ -24,11 +33,21 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins("http://localhost:3000")
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());
 });
+
+var infrastructureAssembly = typeof(UNI_EDU_Backend.Infrastructure.IAssemblyReference).Assembly;
+var applicationAssembly = typeof(UNI_EDU_Backend.Application.IAssemblyReference).Assembly;
+builder.Services.AddMediatR(cfg =>
+    {
+        cfg.RegisterServicesFromAssemblies(applicationAssembly, infrastructureAssembly);
+        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+    }
+);
+builder.Services.AddValidatorsFromAssembly(applicationAssembly);
 
 var app = builder.Build();
 
