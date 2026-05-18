@@ -1,5 +1,4 @@
 ﻿using UNI_EDU_Backend.Domain.Enums;
-using UNI_EDU_Backend.Domain.Models;
 
 namespace UNI_EDU_Backend.Application.DTOs.SendOTP;
 

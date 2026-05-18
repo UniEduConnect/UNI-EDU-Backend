@@ -11,7 +11,7 @@ public class UsersController(IUserService userService) : ControllerBase
 {
     private readonly IUserService _userService = userService;
 
-    [HttpPost]
+    [HttpPost("check-phone")]
     public async Task<IActionResult> CheckPhoneNumber([FromBody] CheckPhoneUserRequest sendOTPUserRequest)
     {
         CheckPhoneUserResponse response = await _userService.CheckPhoneNumberAsync(sendOTPUserRequest);
@@ -23,6 +23,6 @@ public class UsersController(IUserService userService) : ControllerBase
             Data = response
         };
 
-        return StatusCode(StatusCodes.Status200OK, response);
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
     }
 }
