@@ -18,6 +18,7 @@ namespace UNI_EDU_Backend.Application.Services
     {
         private readonly IAuthRepository _authRepository;
         private readonly IStudentRepository _studentRepository;
+        private readonly ITutorRepository _tutorRepository;
         private readonly IGenericRepository<RefreshToken> _genericRepository;
         private readonly IMapper _autoMapper;
         private readonly IUnitOfWork _unitOfWork;
@@ -27,6 +28,7 @@ namespace UNI_EDU_Backend.Application.Services
         public AuthService(
             IAuthRepository authRepository,
             IStudentRepository studentRepository,
+            ITutorRepository tutorRepository,
             IMapper autoMapper,
             IGenericRepository<RefreshToken> genericRepository,
             IUnitOfWork unitOfWork,
@@ -35,6 +37,7 @@ namespace UNI_EDU_Backend.Application.Services
         {
             this._authRepository = authRepository;
             this._studentRepository = studentRepository;
+            this._tutorRepository = tutorRepository;
             this._genericRepository = genericRepository;
             this._autoMapper = autoMapper;
             this._unitOfWork = unitOfWork;
@@ -82,9 +85,29 @@ namespace UNI_EDU_Backend.Application.Services
             return true;
         }
 
-        public Task<User> RegisterTutorAsync(TutorRegister registerDto)
+        public async Task<bool> RegisterTutorAsync(TutorRegister registerDto)
         {
-            throw new NotImplementedException();
+            var existedUser = await _authRepository.IsPhonenumberOrEmailTakenAsync(registerDto.PhoneNumber, registerDto.Email);
+            if (existedUser)
+            {
+                throw new System.InvalidOperationException("Phone number or email is already taken.");
+            }
+
+            var userEntity = _autoMapper.Map<User>(registerDto);
+            userEntity.UserID = Guid.NewGuid();
+            userEntity.HashedPassword = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
+
+            var tutor = _autoMapper.Map<Tutor>(registerDto);
+            tutor.TutorID = userEntity.UserID;
+
+            tutor.User = userEntity;
+
+            await _authRepository.AddAsync(userEntity);
+            await _tutorRepository.AddAsync(tutor);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            return true;
         }
 
         private async Task<TokenResponse> GenerateToken(User user)

@@ -6,7 +6,7 @@ namespace UNI_EDU_Backend.Application.Interfaces
 {
     public interface IAuthService
     {
-        Task<User> RegisterTutorAsync(TutorRegister registerDto);
+        Task<bool> RegisterTutorAsync(TutorRegister registerDto);
         Task<bool> RegisterStudentAsync(StudentRegister registerDto);
         Task<TokenResponse> LoginAsync(LoginRequest loginRequest);
     }
