@@ -1,5 +1,7 @@
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using FluentValidation;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -8,6 +10,9 @@ using UNI_EDU_Backend.Application.Interfaces;
 using UNI_EDU_Backend.Application.Mappings;
 using UNI_EDU_Backend.Application.Services;
 using UNI_EDU_Backend.Domain.Interfaces;
+using UNI_EDU_Backend.Application.Behaviors;
+using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Services.Users;
 using UNI_EDU_Backend.Infrastructure;
 using UNI_EDU_Backend.Infrastructure.Repositories;
 
@@ -15,6 +20,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 Env.Load("../.env");
 builder.Configuration.AddEnvironmentVariables();
@@ -35,7 +43,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins("http://localhost:3000")
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());
@@ -66,6 +74,16 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
+
+var infrastructureAssembly = typeof(UNI_EDU_Backend.Infrastructure.IAssemblyReference).Assembly;
+var applicationAssembly = typeof(UNI_EDU_Backend.Application.IAssemblyReference).Assembly;
+builder.Services.AddMediatR(cfg =>
+    {
+        cfg.RegisterServicesFromAssemblies(applicationAssembly, infrastructureAssembly);
+        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+    }
+);
+builder.Services.AddValidatorsFromAssembly(applicationAssembly);
 
 var app = builder.Build();
 
