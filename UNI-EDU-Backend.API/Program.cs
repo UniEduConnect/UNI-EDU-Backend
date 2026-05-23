@@ -1,10 +1,8 @@
 using DotNetEnv;
-using FluentValidation;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.API.Middleware;
-using UNI_EDU_Backend.Application.Behaviors;
 using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Services.Tutors;
 using UNI_EDU_Backend.Application.Services.Users;
 using UNI_EDU_Backend.Infrastructure;
 using UNI_EDU_Backend.Infrastructure.Repositories;
@@ -15,6 +13,8 @@ builder.Services.AddControllers();
 
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ITutorService, TutorService>();
+builder.Services.AddScoped<ITutorRepository, TutorRepository>();
 
 Env.Load("../.env");
 var db = Env.GetString("POSTGRES_DB");
@@ -38,16 +38,6 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod()
             .AllowCredentials());
 });
-
-var infrastructureAssembly = typeof(UNI_EDU_Backend.Infrastructure.IAssemblyReference).Assembly;
-var applicationAssembly = typeof(UNI_EDU_Backend.Application.IAssemblyReference).Assembly;
-builder.Services.AddMediatR(cfg =>
-    {
-        cfg.RegisterServicesFromAssemblies(applicationAssembly, infrastructureAssembly);
-        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-    }
-);
-builder.Services.AddValidatorsFromAssembly(applicationAssembly);
 
 var app = builder.Build();
 

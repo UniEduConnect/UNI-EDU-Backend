@@ -46,6 +46,92 @@ Clean / onion-layered solution targeting **.NET 10**. Dependencies flow inward: 
 - **Mapping**: Use **Mapster** (`source.Adapt<TDest>()`) for entity↔DTO conversion (see `UserService.CheckPhoneNumberAsync`).
 - **Adding a feature**: Domain entity → DbSet on `ApplicationDbContext` (+ relationship config in `OnModelCreating` if needed) → migration → repository interface in Application + implementation in Infrastructure → service interface + implementation in Application → DTOs + validator → controller endpoint → register the service/repository in `Program.cs`.
 
+## Endpoints
+
+### `GET /api/tutors` — public tutor search
+
+Powers the find-tutor UI shared by [FindTutor.tsx](../UNI-EDU-Frontend-V2/src/pages/FindTutor.tsx), [StudentFindTutor.tsx](../UNI-EDU-Frontend-V2/src/pages/student/StudentFindTutor.tsx), and [ParentFindTutor.tsx](../UNI-EDU-Frontend-V2/src/pages/parent/ParentFindTutor.tsx). Public — no `[Authorize]`. Route follows the `api/[controller]` convention used by `UsersController`, so the path the frontend should call is `/api/tutors` (not the bare `/tutors`).
+
+**Query (all optional, `[FromQuery]` bound to `TutorSearchQuery`)**:
+
+| Param      | Type                          | Notes                                                                                                  |
+| ---------- | ----------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `search`   | string                        | Case-insensitive match against tutor full name **or** any of their subject names.                       |
+| `subject`  | string                        | Vietnamese subject name as stored in `Subjects.SubjectName` (e.g. `Toán`). Frontend sentinel `Tất cả` must be sent as omitted, not as the literal. |
+| `type`     | `all` \| `tutor` \| `teacher` | Default `all`. Maps to a new `Tutor.TutorType` enum (see below).                                       |
+| `minPrice` | int (VND)                     | Default `0`. Inclusive.                                                                                |
+| `maxPrice` | int (VND)                     | Default `500000` (matches the slider cap in `FindTutor.tsx`). Inclusive.                               |
+| `page`     | int                           | 1-based. Default `1`. Server page size is fixed at `10` to match the frontend's `pageSize`.            |
+
+Validator (`TutorSearchQueryValidator`): `page >= 1`, `minPrice >= 0`, `maxPrice >= minPrice`, `type` ∈ allowed set. Failures surface as `ValidationException` through the existing pipeline.
+
+**Response** — wrap in `ApiResponse<PagedResult<TutorListingResponse>>`:
+
+```jsonc
+{
+  "statusCode": 200,
+  "message": "Get tutors successfully",
+  "data": {
+    "items": [ /* TutorListingResponse[] */ ],
+    "total": 124,        // total after filters, before paging — frontend uses this for the result count + pageCount
+    "page": 1,
+    "pageSize": 10
+  }
+}
+```
+
+`PagedResult<T>` is generic and reusable — put it in `UNI-EDU-Backend.API/Commons/PagedResult.cs` next to `ApiResponse`.
+
+**`TutorListingResponse` shape** (mirror the frontend `TutorListing` interface in [StudentContext.tsx:70-91](../UNI-EDU-Frontend-V2/src/contexts/StudentContext.tsx#L70-L91) exactly — field names are camelCased on the wire by the default JSON serializer):
+
+```csharp
+public class TutorListingResponse
+{
+    public Guid Id { get; set; }                       // Tutor.TutorID
+    public string Name { get; set; }                   // Tutor.FullName
+    public string Avatar { get; set; }                 // Tutor.AvatarUrl (new)
+    public List<string> Subjects { get; set; }         // names via Tutor.Subjects M2M (new)
+    public float Rating { get; set; }                  // Tutor.AverageRating (existing)
+    public int TotalReviews { get; set; }              // COUNT(Reviews where TutorID = ...)
+    public int TotalSessions { get; set; }             // COUNT(ClassSessions where TutorID = ...)
+    public int YearsExperience { get; set; }           // Tutor.YearsExperience (new int; keep the existing free-text Experience separately or migrate it)
+    public int HourlyRate { get; set; }                // Tutor.HourlyRate (new, VND)
+    public string Location { get; set; }               // Tutor.Location (new) — keep Address for billing
+    public bool Verified { get; set; }                 // Tutor.IsVerified (new)
+    public string Bio { get; set; }                    // Tutor.Bio (existing)
+    public string School { get; set; }                 // Tutor.School (new)
+    public string Degree { get; set; }                 // Tutor.Degree (existing)
+    public string Type { get; set; }                   // "tutor" | "teacher" — serialize Tutor.TutorType as lowercase string (the frontend discriminator is lowercase)
+    public List<AvailableSlotDto> AvailableSlots { get; set; }  // { day, time }[], nullable
+    public List<string> Certificates { get; set; }     // nullable
+    public string IntroVideoUrl { get; set; }          // nullable
+    public string TeachingStyle { get; set; }          // nullable
+    public List<string> Achievements { get; set; }     // nullable
+}
+```
+
+`AvailableSlot.day` values are Vietnamese (`Thứ 2`, `Chủ nhật`, …) — keep them as raw strings; the frontend renders them verbatim.
+
+**Required domain changes** — the current [Tutor.cs](UNI-EDU-Backend.Domain/Models/Tutor.cs) only carries `FullName`, `DateOfBirth`, `Gender`, `Address`, `Degree`, `Experience`, `Bio`, `AverageRating`. Add (one migration, named e.g. `AddTutorListingFields`):
+
+- Scalar columns on `Tutor`: `AvatarUrl`, `Location`, `School`, `HourlyRate` (int), `YearsExperience` (int), `IsVerified` (bool), `TeachingStyle`, `IntroVideoUrl`, `TutorType` (new enum `TutorType { Tutor, Teacher }` under `Domain/Enums/`).
+- Collection columns on `Tutor` for `Certificates`, `Achievements`, and `AvailableSlots`. Postgres `text[]`/`jsonb` via Npgsql is the path of least resistance — use `jsonb` for `AvailableSlots` (it's a list of objects) and `text[]` for the two string lists. Configure in `OnModelCreating`, **not** via annotations (per the existing convention).
+- M2M `Tutor` ↔ `Subject` via a join entity `TutorSubject { TutorID, SubjectID }` with a composite key configured in `OnModelCreating`. Add `ICollection<Subject> Subjects` to `Tutor` and the inverse on `Subject`.
+
+`TotalReviews` and `TotalSessions` are **derived** from `Reviews` and `ClassSessions` — do not cache them on `Tutor` unless a later perf issue demands it.
+
+**Wiring (follow the existing UserService/UserRepository split)**:
+
+1. `Application/Interfaces/ITutorRepository.cs` — single method `Task<(IReadOnlyList<Tutor> Items, int Total)> SearchAsync(TutorSearchQuery query, CancellationToken ct)`. Pass paging into the repo so it can `Skip/Take` after `CountAsync`, both inside one query plan.
+2. `Infrastructure/Repositories/TutorRepository.cs` — build the `IQueryable<Tutor>` with `.Include(t => t.Subjects)`, apply filters conditionally (`if (!string.IsNullOrWhiteSpace(query.Search)) q = q.Where(...)`), `EF.Functions.ILike` for case-insensitive matching on Postgres, then project review/session counts via correlated subqueries (`Reviews.Count(r => r.TutorID == t.TutorID)`) so paging doesn't pull every row.
+3. `Application/Services/Tutors/ITutorService.cs` + `TutorService.cs` — orchestrate, then `Adapt<TutorListingResponse>()` via Mapster (register a `TypeAdapterConfig` for `Tutor.TutorType` → lowercase string and for the M2M → `List<string>` of subject names).
+4. `API/Controllers/TutorsController.cs` — single `[HttpGet]` action taking `[FromQuery] TutorSearchQuery`, wraps in `ApiResponse<PagedResult<TutorListingResponse>>`. No `try/catch` — let `GlobalExceptionHandlerMiddleware` handle it.
+5. Register both `ITutorService` and `ITutorRepository` in `Program.cs` alongside the existing `IUserService`/`IUserRepository` lines.
+
+**Pattern choice** — `UsersController` calls `IUserService` directly; the MediatR pipeline (with `ValidationBehavior<,>`) is registered but unused by it. For this endpoint either pattern is acceptable, but **prefer MediatR** (`GetTutorListingsQuery : IRequest<PagedResult<TutorListingResponse>>` + handler in `Application/Features/Tutors/Queries/`) so the validator runs automatically. If you stick with the direct service style, invoke `IValidator<TutorSearchQuery>` manually in the controller before calling the service — don't let invalid input reach the repository.
+
+**Error cases** — `BadRequestException` for nothing meaningful here (validator covers shape); return an empty `items` list with `total = 0` when filters match nothing (the frontend already renders an empty-state message). Do not 404.
+
 ## Branching & PRs
 
 Default base for PRs is `dev` (not `main`). CodeRabbit auto-reviews PRs targeting `main` or `dev` (see `.coderabbit.yaml`).
