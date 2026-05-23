@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using UNI_EDU_Backend.Domain.Models;
 
 namespace UNI_EDU_Backend.Infrastructure
@@ -22,6 +23,7 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<Exam> Exams { get; set; }
         public DbSet<ExamQuestion> ExamQuestions { get; set; }
         public DbSet<Submission> Submissions { get; set; }
+        public DbSet<TutorSubject> TutorSubjects { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -93,6 +95,45 @@ namespace UNI_EDU_Backend.Infrastructure
                 .WithMany(e => e.Submissions)
                 .HasForeignKey(s => s.ExamID)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Tutor <-> Subject M2M via TutorSubject join entity
+            modelBuilder.Entity<TutorSubject>()
+                .HasKey(ts => new { ts.TutorID, ts.SubjectID });
+
+            modelBuilder.Entity<TutorSubject>()
+                .HasOne(ts => ts.Tutor)
+                .WithMany(t => t.TutorSubjects)
+                .HasForeignKey(ts => ts.TutorID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TutorSubject>()
+                .HasOne(ts => ts.Subject)
+                .WithMany()
+                .HasForeignKey(ts => ts.SubjectID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Tutor>()
+                .HasMany(t => t.Subjects)
+                .WithMany(s => s.Tutors)
+                .UsingEntity<TutorSubject>(
+                    j => j.HasOne(ts => ts.Subject).WithMany().HasForeignKey(ts => ts.SubjectID),
+                    j => j.HasOne(ts => ts.Tutor).WithMany(t => t.TutorSubjects).HasForeignKey(ts => ts.TutorID));
+
+            // Postgres array / jsonb columns on Tutor
+            modelBuilder.Entity<Tutor>()
+                .Property(t => t.Certificates)
+                .HasColumnType("text[]");
+
+            modelBuilder.Entity<Tutor>()
+                .Property(t => t.Achievements)
+                .HasColumnType("text[]");
+
+            modelBuilder.Entity<Tutor>()
+                .Property(t => t.AvailableSlots)
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<AvailableSlot>>(v, (JsonSerializerOptions?)null) ?? new List<AvailableSlot>());
         }
     }
 }
