@@ -206,4 +206,38 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
             })
             .ToList();
     }
+
+    public Task<bool> ExistsAsync(Guid tutorId, CancellationToken cancellationToken) =>
+        _dbContext.Tutors.AnyAsync(t => t.TutorID == tutorId, cancellationToken);
+
+    public async Task<(List<TutorReviewResponse> Items, int Total)> GetReviewsByTutorIdAsync(Guid tutorId, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var reviews = _dbContext.Reviews.AsNoTracking().Where(r => r.TutorID == tutorId);
+
+        var total = await reviews.CountAsync(cancellationToken);
+
+        var skip = (page - 1) * pageSize;
+
+        var items = await reviews
+            .OrderByDescending(r => r.ReviewDate)
+            .ThenByDescending(r => r.ReviewID)
+            .Skip(skip)
+            .Take(pageSize)
+            .Select(r => new TutorReviewResponse
+            {
+                Id = r.ReviewID,
+                ClassId = r.ClassID,
+                ClassName = r.ClassSession.Subject.SubjectName,
+                StudentName = r.Reviewer.Fullname,
+                ParentName = r.Reviewer.Fullname,
+                Rating = r.Rating,
+                Comment = r.Comment,
+                Date = r.ReviewDate.ToString("yyyy-MM-dd"),
+                Avatar = string.Empty,
+                Subject = r.ClassSession.Subject.SubjectName
+            })
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
 }

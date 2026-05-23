@@ -8,4 +8,6 @@ public interface ITutorService
     public Task<PagedResult<TutorListingResponse>> SearchTutorsAsync(TutorSearchQuery query, CancellationToken cancellationToken);
 
     public Task<TutorProfileResponse> GetTutorProfileAsync(Guid tutorId, CancellationToken cancellationToken);
+
+    public Task<PagedResult<TutorReviewResponse>> GetTutorReviewsAsync(Guid tutorId, TutorReviewsQuery query, CancellationToken cancellationToken);
 }
