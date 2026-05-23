@@ -6,4 +6,6 @@ namespace UNI_EDU_Backend.Application.Services.Tutors;
 public interface ITutorService
 {
     public Task<PagedResult<TutorListingResponse>> SearchTutorsAsync(TutorSearchQuery query, CancellationToken cancellationToken);
+
+    public Task<TutorProfileResponse> GetTutorProfileAsync(Guid tutorId, CancellationToken cancellationToken);
 }

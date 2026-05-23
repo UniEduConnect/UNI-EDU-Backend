@@ -8,4 +8,6 @@ public interface ITutorRepository
         TutorSearchQuery query,
         int pageSize,
         CancellationToken cancellationToken);
+
+    Task<TutorProfileResponse?> GetProfileByIdAsync(Guid tutorId, int recentReviewCount, CancellationToken cancellationToken);
 }

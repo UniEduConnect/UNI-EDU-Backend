@@ -104,4 +104,106 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
         slots == null
             ? new List<AvailableSlotDto>()
             : slots.Select(a => new AvailableSlotDto { Day = a.Day, Time = a.Time }).ToList();
+
+    public async Task<TutorProfileResponse?> GetProfileByIdAsync(Guid tutorId, int recentReviewCount, CancellationToken cancellationToken)
+    {
+        var raw = await _dbContext.Tutors
+            .AsNoTracking()
+            .Where(t => t.TutorID == tutorId)
+            .Select(t => new
+            {
+                t.TutorID,
+                t.FullName,
+                t.AvatarUrl,
+                t.Bio,
+                t.School,
+                t.Degree,
+                t.IntroVideoUrl,
+                t.AverageRating,
+                t.HourlyRate,
+                t.Location,
+                t.TeachingStyle,
+                t.YearsExperience,
+                t.IsVerified,
+                t.TutorType,
+                t.AvailableSlots,
+                t.Achievements,
+                Email = t.User.Email,
+                Phone = t.User.PhoneNumber,
+                JoinDate = t.User.CreatedAt,
+                SubjectNames = t.Subjects.Select(s => s.SubjectName).ToList(),
+                TotalReviews = _dbContext.Reviews.Count(r => r.TutorID == t.TutorID),
+                TotalSessions = _dbContext.ClassSessions.Count(c => c.TutorID == t.TutorID)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (raw == null)
+            return null;
+
+        var reviews = await _dbContext.Reviews
+            .AsNoTracking()
+            .Where(r => r.TutorID == tutorId)
+            .OrderByDescending(r => r.ReviewDate)
+            .Take(recentReviewCount)
+            .Select(r => new TutorReviewResponse
+            {
+                Id = r.ReviewID,
+                ClassId = r.ClassID,
+                ClassName = r.ClassSession.Subject.SubjectName,
+                StudentName = r.Reviewer.Fullname,
+                ParentName = r.Reviewer.Fullname,
+                Rating = r.Rating,
+                Comment = r.Comment,
+                Date = r.ReviewDate.ToString("yyyy-MM-dd"),
+                Avatar = string.Empty,
+                Subject = r.ClassSession.Subject.SubjectName
+            })
+            .ToListAsync(cancellationToken);
+
+        return new TutorProfileResponse
+        {
+            Id = raw.TutorID,
+            Name = raw.FullName,
+            Avatar = raw.AvatarUrl,
+            Email = raw.Email,
+            Phone = raw.Phone,
+            Subjects = raw.SubjectNames,
+            Bio = raw.Bio,
+            School = raw.School,
+            Degree = raw.Degree,
+            DegreeVerified = raw.IsVerified,
+            TranscriptVerified = raw.IsVerified,
+            VideoUrl = raw.IntroVideoUrl,
+            Rating = raw.AverageRating,
+            TotalReviews = raw.TotalReviews,
+            TotalSessions = raw.TotalSessions,
+            TestPassRate = 0,
+            HourlyRate = raw.HourlyRate,
+            Availability = GroupAvailability(raw.AvailableSlots),
+            JoinDate = raw.JoinDate.ToString("yyyy-MM-dd"),
+            Location = raw.Location,
+            TeachingStyle = raw.TeachingStyle,
+            Achievements = raw.Achievements ?? new List<string>(),
+            Role = raw.TutorType == TutorType.Teacher ? "teacher" : "tutor",
+            YearsExperience = raw.YearsExperience,
+            CurrentSchool = null,
+            PlatformFeeRate = 0m,
+            Reviews = reviews
+        };
+    }
+
+    private static List<AvailabilityDayDto> GroupAvailability(List<AvailableSlot>? slots)
+    {
+        if (slots == null || slots.Count == 0)
+            return new List<AvailabilityDayDto>();
+
+        return slots
+            .GroupBy(a => a.Day)
+            .Select(g => new AvailabilityDayDto
+            {
+                Day = g.Key,
+                Slots = g.Select(s => s.Time).ToList()
+            })
+            .ToList();
+    }
 }
