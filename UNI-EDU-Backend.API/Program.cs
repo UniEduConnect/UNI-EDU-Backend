@@ -1,4 +1,5 @@
 using DotNetEnv;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.API.Middleware;
 using UNI_EDU_Backend.Application.Interfaces;
@@ -15,6 +16,9 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ITutorService, TutorService>();
 builder.Services.AddScoped<ITutorRepository, TutorRepository>();
+
+var assemblyApplication = typeof(UNI_EDU_Backend.Application.IAssemblyReference).Assembly;
+builder.Services.AddValidatorsFromAssembly(assemblyApplication);
 
 Env.Load("../.env");
 var db = Env.GetString("POSTGRES_DB");

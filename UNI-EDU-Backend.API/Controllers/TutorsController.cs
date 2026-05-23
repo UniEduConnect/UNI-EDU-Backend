@@ -26,4 +26,19 @@ public class TutorsController(ITutorService tutorService) : ControllerBase
 
         return StatusCode(StatusCodes.Status200OK, apiResponse);
     }
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
+    {
+        TutorProfileResponse profile = await _tutorService.GetTutorProfileAsync(id, cancellationToken);
+
+        ApiResponse<TutorProfileResponse> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get tutor profile successfully",
+            Data = profile
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
 }
