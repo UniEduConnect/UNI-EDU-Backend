@@ -41,4 +41,19 @@ public class TutorsController(ITutorService tutorService) : ControllerBase
 
         return StatusCode(StatusCodes.Status200OK, apiResponse);
     }
+
+    [HttpGet("{id:guid}/reviews")]
+    public async Task<IActionResult> GetReviews(Guid id, [FromQuery] TutorReviewsQuery query, CancellationToken cancellationToken)
+    {
+        PagedResult<TutorReviewResponse> result = await _tutorService.GetTutorReviewsAsync(id, query, cancellationToken);
+
+        ApiResponse<PagedResult<TutorReviewResponse>> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get tutor reviews successfully",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
 }

@@ -10,4 +10,8 @@ public interface ITutorRepository
         CancellationToken cancellationToken);
 
     Task<TutorProfileResponse?> GetProfileByIdAsync(Guid tutorId, int recentReviewCount, CancellationToken cancellationToken);
+
+    Task<bool> ExistsAsync(Guid tutorId, CancellationToken cancellationToken);
+
+    Task<(List<TutorReviewResponse> Items, int Total)> GetReviewsByTutorIdAsync(Guid tutorId, int page, int pageSize, CancellationToken cancellationToken);
 }
