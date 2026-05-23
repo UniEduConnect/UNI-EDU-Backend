@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.Application.Exceptions;
 using UNI_EDU_Backend.Application.Interfaces;
-using UNI_EDU_Backend.Domain.Models;
 
 namespace UNI_EDU_Backend.Infrastructure.Repositories;
 
@@ -9,10 +8,13 @@ public class UserRepository(ApplicationDbContext dbContext) : IUserRepository
 {
     private readonly ApplicationDbContext _dbContext = dbContext;
 
-    public async Task<User> CheckPhoneNumber(string phoneNumber)
+    public async Task<bool> CheckPhoneNumber(string phoneNumber)
     {
-        User user = await _dbContext.Users.FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber) ?? throw new NotFoundException("User with the given phone number not found.");
+        var isExist = await _dbContext.Users.AnyAsync(u => u.PhoneNumber == phoneNumber);
 
-        return user;
+        if (!isExist) 
+            throw new NotFoundException("User with the given phone number not found.");
+
+        return isExist;
     }
 }
