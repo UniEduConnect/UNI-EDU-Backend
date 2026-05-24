@@ -1,7 +1,7 @@
 using UNI_EDU_Backend.Application.DTOs.Tutors;
 using UNI_EDU_Backend.Domain.Models;
 
-namespace UNI_EDU_Backend.Application.Interfaces;
+namespace UNI_EDU_Backend.Application.Interfaces.Repositories;
 
 public interface ITutorRepository : IGenericRepository<Tutor>
 {

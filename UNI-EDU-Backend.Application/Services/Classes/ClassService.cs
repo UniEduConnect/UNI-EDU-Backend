@@ -2,7 +2,7 @@ using FluentValidation;
 using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.Exceptions;
-using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Interfaces.Repositories;
 
 namespace UNI_EDU_Backend.Application.Services.Classes;
 

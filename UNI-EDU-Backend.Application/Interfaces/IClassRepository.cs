@@ -1,6 +1,6 @@
 using UNI_EDU_Backend.Application.DTOs.Classes;
 
-namespace UNI_EDU_Backend.Application.Interfaces;
+namespace UNI_EDU_Backend.Application.Interfaces.Repositories;
 
 public interface IClassRepository
 {

@@ -9,15 +9,17 @@ using System.Text;
 using UNI_EDU_Backend.Application.DTOs.Request.Authentication;
 using UNI_EDU_Backend.Application.DTOs.Response;
 using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Models;
 
-namespace UNI_EDU_Backend.Application.Services
+namespace UNI_EDU_Backend.Application.Services.Auths
 {
     public class AuthService : IAuthService
     {
         private readonly IAuthRepository _authRepository;
         private readonly IStudentRepository _studentRepository;
         private readonly ITutorRepository _tutorRepository;
+        private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly IGenericRepository<RefreshToken> _genericRepository;
         private readonly IMapper _autoMapper;
         private readonly IUnitOfWork _unitOfWork;
@@ -28,6 +30,7 @@ namespace UNI_EDU_Backend.Application.Services
             IAuthRepository authRepository,
             IStudentRepository studentRepository,
             ITutorRepository tutorRepository,
+            IRefreshTokenRepository refreshTokenRepository,
             IMapper autoMapper,
             IGenericRepository<RefreshToken> genericRepository,
             IUnitOfWork unitOfWork,
@@ -37,6 +40,7 @@ namespace UNI_EDU_Backend.Application.Services
             this._authRepository = authRepository;
             this._studentRepository = studentRepository;
             this._tutorRepository = tutorRepository;
+            this._refreshTokenRepository = refreshTokenRepository;
             this._genericRepository = genericRepository;
             this._autoMapper = autoMapper;
             this._unitOfWork = unitOfWork;
@@ -107,6 +111,29 @@ namespace UNI_EDU_Backend.Application.Services
             await _unitOfWork.SaveChangesAsync();
 
             return true;
+        }
+
+        public async Task<TokenResponse> RefreshTokenAsync(RefreshTokenRequest request)
+        {
+            var existToken = await _refreshTokenRepository.GetFirstOrDefaultAsync(x => x.Token == request.RefreshToken);
+
+            if(existToken == null || existToken.IsUsed || existToken.IsRevoked || existToken.ExpiresAt < DateTime.UtcNow)
+            {
+                throw new Exceptions.UnauthorizedAccessException("Invalid refresh token.");
+            }
+
+            existToken.IsRevoked = true;
+            existToken.IsUsed = true;
+            _refreshTokenRepository.Update(existToken);
+            await _unitOfWork.SaveChangesAsync();
+
+            var user = await _authRepository.GetByIdAsync(existToken.UserID);
+            if (user == null)
+            {
+                throw new Exceptions.UnauthorizedAccessException("User not found.");
+            }
+
+            return await GenerateToken(user);
         }
 
         private async Task<TokenResponse> GenerateToken(User user)

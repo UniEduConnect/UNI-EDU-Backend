@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
-using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Interfaces.Repositories;
 
 namespace UNI_EDU_Backend.Infrastructure.Repositories
 {

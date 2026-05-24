@@ -5,15 +5,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using UNI_EDU_Backend.API.Middleware;
-using UNI_EDU_Backend.Application.Interfaces;
 using UNI_EDU_Backend.Application.Mappings;
-using UNI_EDU_Backend.Application.Services;
 using UNI_EDU_Backend.API.Json;
 using UNI_EDU_Backend.Application.Services.Classes;
 using UNI_EDU_Backend.Application.Services.Tutors;
 using UNI_EDU_Backend.Application.Services.Users;
 using UNI_EDU_Backend.Infrastructure;
 using UNI_EDU_Backend.Infrastructure.Repositories;
+using UNI_EDU_Backend.Application.Interfaces.Repositories;
+using UNI_EDU_Backend.Application.Services.Auths;
+using UNI_EDU_Backend.Application.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +33,7 @@ builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepositor
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IStudentRepository, StudentRepository>();
 builder.Services.AddScoped<ITutorRepository, TutorRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IClassRepository, ClassRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();

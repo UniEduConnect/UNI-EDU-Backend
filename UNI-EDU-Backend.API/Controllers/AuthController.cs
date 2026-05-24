@@ -2,7 +2,7 @@
 using UNI_EDU_Backend.API.Commons;
 using UNI_EDU_Backend.Application.DTOs.Request.Authentication;
 using UNI_EDU_Backend.Application.DTOs.Response;
-using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Services.Auths;
 
 namespace UNI_EDU_Backend.API.Controllers
 {
@@ -51,6 +51,19 @@ namespace UNI_EDU_Backend.API.Controllers
             {
                 StatusCode = 201,
                 Message = "Tutor registered successfully",
+                Data = response
+            });
+        }
+
+        [HttpPost]
+        [Route("api/refresh-token")]
+        public async Task<IActionResult> RefreshTokenAsync([FromBody] RefreshTokenRequest request)
+        {
+            var response = await _authService.RefreshTokenAsync(request);
+            return Ok(new ApiResponse<TokenResponse>
+            {
+                StatusCode = 200,
+                Message = "Refresh token generated successfully",
                 Data = response
             });
         }

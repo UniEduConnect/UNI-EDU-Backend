@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Models;
 
 namespace UNI_EDU_Backend.Infrastructure.Repositories

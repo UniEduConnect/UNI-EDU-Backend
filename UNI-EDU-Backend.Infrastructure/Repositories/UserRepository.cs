@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.Application.Exceptions;
-using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Interfaces.Repositories;
 
 namespace UNI_EDU_Backend.Infrastructure.Repositories;
 
