@@ -10,6 +10,7 @@ namespace UNI_EDU_Backend.API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+
         public AuthController(IAuthService authService)
         {
             this._authService = authService;
@@ -26,7 +27,6 @@ namespace UNI_EDU_Backend.API.Controllers
                 Message = "Login successful",
                 Data = response
             });
-
         }
 
         [HttpPost]
@@ -57,14 +57,59 @@ namespace UNI_EDU_Backend.API.Controllers
 
         [HttpPost]
         [Route("api/refresh-token")]
-        public async Task<IActionResult> RefreshTokenAsync([FromBody] RefreshTokenRequest request)
+        public async Task<IActionResult> RefreshTokenAsync()
         {
-            var response = await _authService.RefreshTokenAsync(request);
-            return Ok(new ApiResponse<TokenResponse>
+            var refreshToken = Request.Cookies["refreshToken"];
+
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                return Unauthorized(new ApiResponse<object>
+                {
+                    StatusCode = 401,
+                    Message = "Refresh token is missing",
+                    Data = null
+                });
+            }
+
+            try
+            {
+                var response = await _authService.RefreshTokenAsync(refreshToken);
+
+                return Ok(new ApiResponse<TokenResponse>
+                {
+                    StatusCode = 200,
+                    Message = "Refresh token generated successfully",
+                    Data = response
+                });
+            }
+            catch (Exception ex)
+            {
+                return Unauthorized(new ApiResponse<object>
+                {
+                    StatusCode = 401,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
+
+        [HttpPost]
+        [Route("api/logout")]
+        public async Task<IActionResult> LogoutAsync()
+        {
+            Response.Cookies.Append("refreshToken", "", new CookieOptions
+            {
+                Expires = DateTime.UtcNow.AddDays(-1),
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict
+            });
+
+            return Ok(new ApiResponse<object>
             {
                 StatusCode = 200,
-                Message = "Refresh token generated successfully",
-                Data = response
+                Message = "Logged out successfully",
+                Data = null
             });
         }
     }

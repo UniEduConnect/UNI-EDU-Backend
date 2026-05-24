@@ -113,9 +113,9 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             return true;
         }
 
-        public async Task<TokenResponse> RefreshTokenAsync(RefreshTokenRequest request)
+        public async Task<TokenResponse> RefreshTokenAsync(string request)
         {
-            var existToken = await _refreshTokenRepository.GetFirstOrDefaultAsync(x => x.Token == request.RefreshToken);
+            var existToken = await _refreshTokenRepository.GetFirstOrDefaultAsync(x => x.Token == request);
 
             if(existToken == null || existToken.IsUsed || existToken.IsRevoked || existToken.ExpiresAt < DateTime.UtcNow)
             {

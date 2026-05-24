@@ -8,6 +8,6 @@ namespace UNI_EDU_Backend.Application.Services.Auths
         Task<bool> RegisterTutorAsync(TutorRegister registerDto);
         Task<bool> RegisterStudentAsync(StudentRegister registerDto);
         Task<TokenResponse> LoginAsync(LoginRequest loginRequest);
-        Task<TokenResponse> RefreshTokenAsync(RefreshTokenRequest request);
+        Task<TokenResponse> RefreshTokenAsync(string request);
     }
 }
