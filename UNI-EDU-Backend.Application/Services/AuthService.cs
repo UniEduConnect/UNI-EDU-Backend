@@ -134,7 +134,7 @@ namespace UNI_EDU_Backend.Application.Services
             var refreshTokenEntity = new RefreshToken
             {
                 Token = GenerateRefreshToken(),
-                JwtId = accessTokenString,
+                JwtId = jwtId,
                 UserID = user.UserID,
                 IsUsed = false,
                 IsRevoked = false,
@@ -150,7 +150,6 @@ namespace UNI_EDU_Backend.Application.Services
             return new TokenResponse
             {
                 AccessToken = accessTokenString,
-                RefreshToken = refreshTokenEntity.Token
             };
         }
 
