@@ -1,4 +1,4 @@
-﻿namespace UNI_EDU_Backend.Domain.Interfaces
+﻿namespace UNI_EDU_Backend.Application.Interfaces
 {
     public interface IUnitOfWork : IDisposable
     {

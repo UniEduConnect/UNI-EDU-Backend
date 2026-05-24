@@ -1,4 +1,4 @@
-﻿using UNI_EDU_Backend.Domain.Interfaces;
+﻿using UNI_EDU_Backend.Application.Interfaces;
 
 namespace UNI_EDU_Backend.Infrastructure.Repositories
 {

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UNI_EDU_Backend.Infrastructure;
@@ -12,9 +13,11 @@ using UNI_EDU_Backend.Infrastructure;
 namespace UNI_EDU_Backend.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260523083031_AddTutorSubject")]
+    partial class AddTutorSubject
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -342,6 +345,10 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text[]");
 
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("AvailableSlots")
                         .IsRequired()
                         .HasColumnType("jsonb");
@@ -365,6 +372,10 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Degree")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Experience")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -392,9 +403,6 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
 
                     b.Property<string>("School")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("StudentIdNumber")
                         .HasColumnType("text");
 
                     b.Property<string>("TeachingStyle")

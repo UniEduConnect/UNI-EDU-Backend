@@ -9,7 +9,6 @@ using System.Text;
 using UNI_EDU_Backend.Application.DTOs.Request.Authentication;
 using UNI_EDU_Backend.Application.DTOs.Response;
 using UNI_EDU_Backend.Application.Interfaces;
-using UNI_EDU_Backend.Domain.Interfaces;
 using UNI_EDU_Backend.Domain.Models;
 
 namespace UNI_EDU_Backend.Application.Services

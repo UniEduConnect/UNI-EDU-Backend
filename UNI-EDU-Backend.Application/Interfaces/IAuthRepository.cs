@@ -1,6 +1,6 @@
 ﻿using UNI_EDU_Backend.Domain.Models;
 
-namespace UNI_EDU_Backend.Domain.Interfaces
+namespace UNI_EDU_Backend.Application.Interfaces
 {
     public interface IAuthRepository : IGenericRepository<User>
     {
