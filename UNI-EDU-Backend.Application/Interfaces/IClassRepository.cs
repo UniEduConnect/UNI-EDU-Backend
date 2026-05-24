@@ -1,0 +1,12 @@
+using UNI_EDU_Backend.Application.DTOs.Classes;
+
+namespace UNI_EDU_Backend.Application.Interfaces;
+
+public interface IClassRepository
+{
+    Task<bool> TutorExistsAsync(Guid tutorId, CancellationToken cancellationToken);
+    Task<bool> StudentExistsAsync(Guid studentId, CancellationToken cancellationToken);
+    Task<string?> GetSubjectNameAsync(Guid subjectId, CancellationToken cancellationToken);
+
+    Task<ClassResponse> CreateClassWithEscrowAsync(CreateClassRequest request, CancellationToken cancellationToken);
+}

@@ -1,8 +1,10 @@
 using DotNetEnv;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using UNI_EDU_Backend.API.Json;
 using UNI_EDU_Backend.API.Middleware;
 using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Services.Classes;
 using UNI_EDU_Backend.Application.Services.Tutors;
 using UNI_EDU_Backend.Application.Services.Users;
 using UNI_EDU_Backend.Infrastructure;
@@ -10,12 +12,19 @@ using UNI_EDU_Backend.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new FlexibleTimeOnlyConverter());
+    });
 
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ITutorService, TutorService>();
 builder.Services.AddScoped<ITutorRepository, TutorRepository>();
+builder.Services.AddScoped<IClassService, ClassService>();
+builder.Services.AddScoped<IClassRepository, ClassRepository>();
 
 var assemblyApplication = typeof(UNI_EDU_Backend.Application.IAssemblyReference).Assembly;
 builder.Services.AddValidatorsFromAssembly(assemblyApplication);
