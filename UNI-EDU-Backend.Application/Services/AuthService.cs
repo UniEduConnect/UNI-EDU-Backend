@@ -48,13 +48,13 @@ namespace UNI_EDU_Backend.Application.Services
             var user = await _authRepository.GetUserByEmailAsync(loginRequest.Email);
             if (user == null)
             {
-                throw new System.UnauthorizedAccessException();
+                throw new Exceptions.UnauthorizedAccessException("Invalid email or password.");
             }
 
             bool isPasswordValid = BCrypt.Net.BCrypt.Verify(loginRequest.Password, user.HashedPassword); 
             if (!isPasswordValid)
             {
-                throw new System.UnauthorizedAccessException();
+                throw new Exceptions.UnauthorizedAccessException("Invalid email or password.");
             }
             return await GenerateToken(user);
         }
@@ -64,7 +64,7 @@ namespace UNI_EDU_Backend.Application.Services
             var existedUser = await _authRepository.IsPhonenumberOrEmailTakenAsync(registerDto.PhoneNumber, registerDto.Email);
             if (existedUser)
             {
-                throw new System.InvalidOperationException("Phone number or email is already taken.");
+                throw new Exceptions.BadRequestException("Phone number or email is already taken.");
             }
 
             var userEntity = _autoMapper.Map<User>(registerDto);
@@ -89,7 +89,7 @@ namespace UNI_EDU_Backend.Application.Services
             var existedUser = await _authRepository.IsPhonenumberOrEmailTakenAsync(registerDto.PhoneNumber, registerDto.Email);
             if (existedUser)
             {
-                throw new System.InvalidOperationException("Phone number or email is already taken.");
+                throw new Exceptions.BadRequestException("Phone number or email is already taken.");
             }
 
             var userEntity = _autoMapper.Map<User>(registerDto);
