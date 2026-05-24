@@ -56,7 +56,7 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
                 SubjectNames = t.Subjects.Select(s => s.SubjectName).ToList(),
                 t.AverageRating,
                 TotalReviews = _dbContext.Reviews.Count(r => r.TutorID == t.TutorID),
-                TotalSessions = _dbContext.ClassSessions.Count(c => c.TutorID == t.TutorID),
+                TotalSessions = _dbContext.Classes.Count(c => c.TutorID == t.TutorID),
                 t.YearsExperience,
                 t.HourlyRate,
                 t.Location,
@@ -133,7 +133,7 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
                 JoinDate = t.User.CreatedAt,
                 SubjectNames = t.Subjects.Select(s => s.SubjectName).ToList(),
                 TotalReviews = _dbContext.Reviews.Count(r => r.TutorID == t.TutorID),
-                TotalSessions = _dbContext.ClassSessions.Count(c => c.TutorID == t.TutorID)
+                TotalSessions = _dbContext.Classes.Count(c => c.TutorID == t.TutorID)
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -149,14 +149,14 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
             {
                 Id = r.ReviewID,
                 ClassId = r.ClassID,
-                ClassName = r.ClassSession.Subject.SubjectName,
+                ClassName = r.Class.Subject.SubjectName,
                 StudentName = r.Reviewer.Fullname,
                 ParentName = r.Reviewer.Fullname,
                 Rating = r.Rating,
                 Comment = r.Comment,
                 Date = r.ReviewDate.ToString("yyyy-MM-dd"),
                 Avatar = string.Empty,
-                Subject = r.ClassSession.Subject.SubjectName
+                Subject = r.Class.Subject.SubjectName
             })
             .ToListAsync(cancellationToken);
 
@@ -227,14 +227,14 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
             {
                 Id = r.ReviewID,
                 ClassId = r.ClassID,
-                ClassName = r.ClassSession.Subject.SubjectName,
+                ClassName = r.Class.Subject.SubjectName,
                 StudentName = r.Reviewer.Fullname,
                 ParentName = r.Reviewer.Fullname,
                 Rating = r.Rating,
                 Comment = r.Comment,
                 Date = r.ReviewDate.ToString("yyyy-MM-dd"),
                 Avatar = string.Empty,
-                Subject = r.ClassSession.Subject.SubjectName
+                Subject = r.Class.Subject.SubjectName
             })
             .ToListAsync(cancellationToken);
 

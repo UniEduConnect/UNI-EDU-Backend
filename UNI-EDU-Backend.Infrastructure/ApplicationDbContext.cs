@@ -17,13 +17,16 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<Parent> Parents { get; set; }
         public DbSet<Student> Students { get; set; }
         public DbSet<Subject> Subjects { get; set; }
-        public DbSet<ClassSession> ClassSessions { get; set; }
+        public DbSet<Class> Classes { get; set; }
         public DbSet<Review> Reviews { get; set; }
         public DbSet<Question> Questions { get; set; }
         public DbSet<Exam> Exams { get; set; }
         public DbSet<ExamQuestion> ExamQuestions { get; set; }
         public DbSet<Submission> Submissions { get; set; }
         public DbSet<TutorSubject> TutorSubjects { get; set; }
+        public DbSet<Wallet> Wallets { get; set; }
+        public DbSet<WalletTransaction> WalletTransactions { get; set; }
+        public DbSet<Session> Sessions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -51,14 +54,14 @@ namespace UNI_EDU_Backend.Infrastructure
 
             // 3. Prevent Cascade Delete Cycles (Multiple Cascade Paths)
 
-            // Restrict ClassSession deletes
-            modelBuilder.Entity<ClassSession>()
+            // Restrict Class deletes
+            modelBuilder.Entity<Class>()
                 .HasOne(c => c.Tutor)
                 .WithMany(t => t.Classes)
                 .HasForeignKey(c => c.TutorID)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<ClassSession>()
+            modelBuilder.Entity<Class>()
                 .HasOne(c => c.Student)
                 .WithMany(s => s.Classes)
                 .HasForeignKey(c => c.StudentID)
@@ -78,7 +81,7 @@ namespace UNI_EDU_Backend.Infrastructure
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Review>()
-                .HasOne(r => r.ClassSession)
+                .HasOne(r => r.Class)
                 .WithMany(c => c.Reviews)
                 .HasForeignKey(r => r.ClassID)
                 .OnDelete(DeleteBehavior.Cascade); // Deleting class removes its reviews
@@ -119,6 +122,32 @@ namespace UNI_EDU_Backend.Infrastructure
                     j => j.HasOne(ts => ts.Subject).WithMany().HasForeignKey(ts => ts.SubjectID),
                     j => j.HasOne(ts => ts.Tutor).WithMany(t => t.TutorSubjects).HasForeignKey(ts => ts.TutorID));
 
+            // Wallet 1-to-1 with User (UserID is PK + FK)
+            modelBuilder.Entity<Wallet>()
+                .HasOne(w => w.User)
+                .WithOne()
+                .HasForeignKey<Wallet>(w => w.UserID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<WalletTransaction>()
+                .HasOne(t => t.Wallet)
+                .WithMany(w => w.Transactions)
+                .HasForeignKey(t => t.UserID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<WalletTransaction>()
+                .HasOne(t => t.Class)
+                .WithMany()
+                .HasForeignKey(t => t.RelatedClassID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Session child of Class (cascade)
+            modelBuilder.Entity<Session>()
+                .HasOne(s => s.Class)
+                .WithMany(c => c.Sessions)
+                .HasForeignKey(s => s.ClassID)
+                .OnDelete(DeleteBehavior.Cascade);
+
             // Postgres array / jsonb columns on Tutor
             modelBuilder.Entity<Tutor>()
                 .Property(t => t.Certificates)
@@ -134,6 +163,13 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                     v => JsonSerializer.Deserialize<List<AvailableSlot>>(v, (JsonSerializerOptions?)null) ?? new List<AvailableSlot>());
+
+            modelBuilder.Entity<Class>()
+                .Property(c => c.WeeklySlots)
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<ClassScheduleSlot>>(v, (JsonSerializerOptions?)null) ?? new List<ClassScheduleSlot>());
         }
     }
 }

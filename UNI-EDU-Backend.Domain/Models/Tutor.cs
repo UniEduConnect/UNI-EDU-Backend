@@ -12,7 +12,6 @@ namespace UNI_EDU_Backend.Domain.Models
         public string FullName { get; set; }
         public DateTime DateOfBirth { get; set; }
         public string Gender { get; set; }
-        public string Address { get; set; }
         public string Degree { get; set; }
         public string Experience { get; set; }
         public string Bio { get; set; }
@@ -34,7 +33,7 @@ namespace UNI_EDU_Backend.Domain.Models
 
         // Navigation Properties
         public virtual User User { get; set; }
-        public virtual ICollection<ClassSession> Classes { get; set; }
+        public virtual ICollection<Class> Classes { get; set; }
         public virtual ICollection<Subject> Subjects { get; set; } = new List<Subject>();
         public virtual ICollection<TutorSubject> TutorSubjects { get; set; } = new List<TutorSubject>();
     }

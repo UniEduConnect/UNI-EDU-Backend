@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UNI_EDU_Backend.Infrastructure;
@@ -12,9 +13,11 @@ using UNI_EDU_Backend.Infrastructure;
 namespace UNI_EDU_Backend.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260524073519_UpdateClassFromClassSession_AddSession_AddWallet_AddWalletTransaction")]
+    partial class UpdateClassFromClassSession_AddSession_AddWallet_AddWalletTransaction
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -54,6 +57,10 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.Property<int>("ReleaseMilestone")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Schedule")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -74,10 +81,6 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
 
                     b.Property<Guid>("TutorID")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("WeeklySlots")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
 
                     b.HasKey("ClassID");
 
@@ -299,17 +302,18 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime>("EndAt")
+                    b.Property<DateTime>("Date")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Format")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime>("StartAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Time")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.HasKey("SessionID");
 
