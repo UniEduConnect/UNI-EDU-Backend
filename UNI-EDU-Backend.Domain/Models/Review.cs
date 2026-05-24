@@ -14,7 +14,7 @@ namespace UNI_EDU_Backend.Domain.Models
         [ForeignKey("Tutor")]
         public Guid TutorID { get; set; }
 
-        [ForeignKey("ClassSession")]
+        [ForeignKey("Class")]
         public Guid ClassID { get; set; }
 
         [Range(1, 5)]
@@ -27,6 +27,6 @@ namespace UNI_EDU_Backend.Domain.Models
         public virtual User Reviewer { get; set; }
 
         public virtual Tutor Tutor { get; set; }
-        public virtual ClassSession ClassSession { get; set; }
+        public virtual Class Class { get; set; }
     }
 }

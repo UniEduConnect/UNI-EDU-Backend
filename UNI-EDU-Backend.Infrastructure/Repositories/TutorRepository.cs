@@ -60,14 +60,14 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
                 SubjectNames = t.Subjects.Select(s => s.SubjectName).ToList(),
                 AverageRating = t.AverageRating ?? 0,
                 TotalReviews = _dbContext.Reviews.Count(r => r.TutorID == t.TutorID),
-                TotalSessions = _dbContext.ClassSessions.Count(c => c.TutorID == t.TutorID),
-                YearsExperience = t.YearsExperience ?? 0,
-                HourlyRate = t.HourlyRate ?? 0,
-                Location = t.Location ?? string.Empty,
-                IsVerified = t.IsVerified ?? false,
-                Bio = t.Bio ?? string.Empty,
-                School = t.School ?? string.Empty,
-                Degree = t.Degree ?? string.Empty,
+                TotalSessions = _dbContext.Classes.Count(c => c.TutorID == t.TutorID),
+                t.YearsExperience,
+                t.HourlyRate,
+                t.Location,
+                t.IsVerified,
+                t.Bio,
+                t.School,
+                t.Degree,
                 t.TutorType,
                 AvailableSlots = t.AvailableSlots != null
                     ? t.AvailableSlots.Select(a => new AvailableSlotDto { Day = a.Day, Time = a.Time }).ToList()
@@ -89,10 +89,10 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
             Rating = t.AverageRating,
             TotalReviews = t.TotalReviews,
             TotalSessions = t.TotalSessions,
-            YearsExperience = t.YearsExperience,
-            HourlyRate = t.HourlyRate,
+            YearsExperience = t.YearsExperience ?? 0,
+            HourlyRate = t.HourlyRate ?? 0,
             Location = t.Location,
-            Verified = t.IsVerified,
+            Verified = t.IsVerified ?? false,
             Bio = t.Bio,
             School = t.School,
             Degree = t.Degree,
@@ -143,7 +143,7 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
                 JoinDate = t.User != null ? t.User.CreatedAt : DateTime.UtcNow,
                 SubjectNames = t.Subjects.Select(s => s.SubjectName).ToList(),
                 TotalReviews = _dbContext.Reviews.Count(r => r.TutorID == t.TutorID),
-                TotalSessions = _dbContext.ClassSessions.Count(c => c.TutorID == t.TutorID)
+                TotalSessions = _dbContext.Classes.Count(c => c.TutorID == t.TutorID)
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -155,33 +155,20 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
             .Where(r => r.TutorID == tutorId)
             .OrderByDescending(r => r.ReviewDate)
             .Take(recentReviewCount)
-            .Select(r => new
+            .Select(r => new TutorReviewResponse
             {
-                r.ReviewID,
-                r.ClassID,
-                ClassName = r.ClassSession.Subject.SubjectName ?? string.Empty,
-                StudentName = r.Reviewer.Fullname ?? string.Empty,
-                ParentName = r.Reviewer.Fullname ?? string.Empty,
-                r.Rating,
-                Comment = r.Comment ?? string.Empty,
-                r.ReviewDate,
-                Subject = r.ClassSession.Subject.SubjectName ?? string.Empty
+                Id = r.ReviewID,
+                ClassId = r.ClassID,
+                ClassName = r.Class.Subject.SubjectName,
+                StudentName = r.Reviewer.Fullname,
+                ParentName = r.Reviewer.Fullname,
+                Rating = r.Rating,
+                Comment = r.Comment,
+                Date = r.ReviewDate.ToString("yyyy-MM-dd"),
+                Avatar = string.Empty,
+                Subject = r.Class.Subject.SubjectName
             })
             .ToListAsync(cancellationToken);
-
-        var reviews = rawReviews.Select(r => new TutorReviewResponse
-        {
-            Id = r.ReviewID,
-            ClassId = r.ClassID,
-            ClassName = r.ClassName,
-            StudentName = r.StudentName,
-            ParentName = r.ParentName,
-            Rating = r.Rating,
-            Comment = r.Comment,
-            Date = r.ReviewDate.ToString("yyyy-MM-dd"),
-            Avatar = string.Empty,
-            Subject = r.Subject
-        }).ToList();
 
         return new TutorProfileResponse
         {
@@ -211,7 +198,7 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
             YearsExperience = raw.YearsExperience,
             CurrentSchool = null,
             PlatformFeeRate = 0m,
-            Reviews = reviews
+            Reviews = rawReviews
         };
     }
 
@@ -250,14 +237,14 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
             {
                 Id = r.ReviewID,
                 ClassId = r.ClassID,
-                ClassName = r.ClassSession.Subject.SubjectName,
+                ClassName = r.Class.Subject.SubjectName,
                 StudentName = r.Reviewer.Fullname,
                 ParentName = r.Reviewer.Fullname,
                 Rating = r.Rating,
                 Comment = r.Comment,
                 Date = r.ReviewDate.ToString("yyyy-MM-dd"),
                 Avatar = string.Empty,
-                Subject = r.ClassSession.Subject.SubjectName
+                Subject = r.Class.Subject.SubjectName
             })
             .ToListAsync(cancellationToken);
 

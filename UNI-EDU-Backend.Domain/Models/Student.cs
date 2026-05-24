@@ -19,6 +19,6 @@ namespace UNI_EDU_Backend.Domain.Models
         // Navigation Properties
         public virtual User User { get; set; }
         public virtual Parent Parent { get; set; }
-        public virtual ICollection<ClassSession> Classes { get; set; }
+        public virtual ICollection<Class> Classes { get; set; }
     }
 }

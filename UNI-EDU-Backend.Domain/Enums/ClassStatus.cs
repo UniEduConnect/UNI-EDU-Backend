@@ -1,8 +1,11 @@
-﻿namespace UNI_EDU_Backend.Domain.Enums
+namespace UNI_EDU_Backend.Domain.Enums
 {
     public enum ClassStatus
     {
-        Ongoing,
-        Completed
+        Searching = 0,
+        Active = 1,
+        Completed = 2,
+        Paused = 3,
+        Cancelled = 4
     }
 }

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UNI_EDU_Backend.Infrastructure;
@@ -12,9 +13,11 @@ using UNI_EDU_Backend.Infrastructure;
 namespace UNI_EDU_Backend.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260524090713_AddClassScheduleSlot")]
+    partial class AddClassScheduleSlot
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -402,27 +405,36 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.PrimitiveCollection<List<string>>("Achievements")
+                        .IsRequired()
                         .HasColumnType("text[]");
 
                     b.Property<string>("AvailableSlots")
+                        .IsRequired()
                         .HasColumnType("jsonb");
 
                     b.Property<string>("AvatarUrl")
+                        .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<float?>("AverageRating")
+                    b.Property<float>("AverageRating")
                         .HasColumnType("real");
 
                     b.Property<string>("Bio")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.PrimitiveCollection<List<string>>("Certificates")
+                        .IsRequired()
                         .HasColumnType("text[]");
 
-                    b.Property<DateTime?>("DateOfBirth")
+                    b.Property<DateTime>("DateOfBirth")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Degree")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Experience")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -434,31 +446,32 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int?>("HourlyRate")
+                    b.Property<int>("HourlyRate")
                         .HasColumnType("integer");
 
                     b.Property<string>("IntroVideoUrl")
+                        .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<bool?>("IsVerified")
+                    b.Property<bool>("IsVerified")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Location")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("School")
-                        .HasColumnType("text");
-
-                    b.Property<string>("StudentIdNumber")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("TeachingStyle")
+                        .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int?>("TutorType")
+                    b.Property<int>("TutorType")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("YearsExperience")
+                    b.Property<int>("YearsExperience")
                         .HasColumnType("integer");
 
                     b.HasKey("TutorID");

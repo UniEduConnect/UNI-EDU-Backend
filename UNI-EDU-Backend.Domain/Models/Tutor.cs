@@ -34,8 +34,7 @@ namespace UNI_EDU_Backend.Domain.Models
 
         // Navigation Properties
         public virtual User User { get; set; }
-
-        public virtual ICollection<ClassSession> Classes { get; set; }
+        public virtual ICollection<Class> Classes { get; set; }
         public virtual ICollection<Subject> Subjects { get; set; } = new List<Subject>();
         public virtual ICollection<TutorSubject> TutorSubjects { get; set; } = new List<TutorSubject>();
     }
