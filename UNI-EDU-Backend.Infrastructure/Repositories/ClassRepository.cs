@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.Exceptions;
-using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Enums;
 using UNI_EDU_Backend.Domain.Models;
 

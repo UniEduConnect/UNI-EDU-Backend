@@ -1,19 +1,23 @@
 using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.Application.DTOs.Tutors;
-using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Enums;
 using UNI_EDU_Backend.Domain.Models;
 
 namespace UNI_EDU_Backend.Infrastructure.Repositories;
 
-public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
+public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
 {
-    private readonly ApplicationDbContext _dbContext = dbContext;
+    private readonly ApplicationDbContext _dbContext;
+    public TutorRepository(ApplicationDbContext context) : base(context)
+    {
+        this._dbContext = context;
+    }
 
     public async Task<(List<TutorListingResponse> Items, int Total)> SearchAsync(
-        TutorSearchQuery query,
-        int pageSize,
-        CancellationToken cancellationToken)
+    TutorSearchQuery query,
+    int pageSize,
+    CancellationToken cancellationToken)
     {
         var tutors = _dbContext.Tutors.AsNoTracking().AsQueryable();
 
@@ -40,9 +44,9 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
         tutors = tutors.Where(t => t.HourlyRate >= query.MinPrice && t.HourlyRate <= query.MaxPrice);
 
         var total = await tutors.CountAsync(cancellationToken);
-
         var skip = (query.Page - 1) * pageSize;
 
+        // 1. Handle all nullable fields directly in the database projection using ??
         var raw = await tutors
             .OrderByDescending(t => t.AverageRating)
             .ThenBy(t => t.TutorID)
@@ -51,10 +55,10 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
             .Select(t => new
             {
                 t.TutorID,
-                t.FullName,
-                t.AvatarUrl,
+                FullName = t.FullName ?? string.Empty,
+                AvatarUrl = t.AvatarUrl ?? string.Empty,
                 SubjectNames = t.Subjects.Select(s => s.SubjectName).ToList(),
-                t.AverageRating,
+                AverageRating = t.AverageRating ?? 0,
                 TotalReviews = _dbContext.Reviews.Count(r => r.TutorID == t.TutorID),
                 TotalSessions = _dbContext.Classes.Count(c => c.TutorID == t.TutorID),
                 t.YearsExperience,
@@ -65,11 +69,14 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
                 t.School,
                 t.Degree,
                 t.TutorType,
-                t.AvailableSlots,
-                t.Certificates,
-                t.IntroVideoUrl,
-                t.TeachingStyle,
-                t.Achievements
+                AvailableSlots = t.AvailableSlots != null
+                    ? t.AvailableSlots.Select(a => new AvailableSlotDto { Day = a.Day, Time = a.Time }).ToList()
+                    : new List<AvailableSlotDto>(),
+
+                Certificates = t.Certificates ?? new List<string>(),
+                IntroVideoUrl = t.IntroVideoUrl ?? string.Empty,
+                TeachingStyle = t.TeachingStyle ?? string.Empty,
+                Achievements = t.Achievements ?? new List<string>()
             })
             .ToListAsync(cancellationToken);
 
@@ -82,15 +89,15 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
             Rating = t.AverageRating,
             TotalReviews = t.TotalReviews,
             TotalSessions = t.TotalSessions,
-            YearsExperience = t.YearsExperience,
-            HourlyRate = t.HourlyRate,
+            YearsExperience = t.YearsExperience ?? 0,
+            HourlyRate = t.HourlyRate ?? 0,
             Location = t.Location,
-            Verified = t.IsVerified,
+            Verified = t.IsVerified ?? false,
             Bio = t.Bio,
             School = t.School,
             Degree = t.Degree,
             Type = t.TutorType == TutorType.Teacher ? "teacher" : "tutor",
-            AvailableSlots = MapSlots(t.AvailableSlots),
+            AvailableSlots = t.AvailableSlots,
             Certificates = t.Certificates,
             IntroVideoUrl = t.IntroVideoUrl,
             TeachingStyle = t.TeachingStyle,
@@ -113,24 +120,27 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
             .Select(t => new
             {
                 t.TutorID,
-                t.FullName,
-                t.AvatarUrl,
-                t.Bio,
-                t.School,
-                t.Degree,
-                t.IntroVideoUrl,
-                t.AverageRating,
-                t.HourlyRate,
-                t.Location,
-                t.TeachingStyle,
-                t.YearsExperience,
-                t.IsVerified,
+                FullName = t.FullName ?? string.Empty,
+                AvatarUrl = t.AvatarUrl ?? string.Empty,
+                Bio = t.Bio ?? string.Empty,
+                School = t.School ?? string.Empty,
+                Degree = t.Degree ?? string.Empty,
+                IntroVideoUrl = t.IntroVideoUrl ?? string.Empty,
+                AverageRating = t.AverageRating ?? 0,
+                HourlyRate = t.HourlyRate ?? 0,
+                Location = t.Location ?? string.Empty,
+                TeachingStyle = t.TeachingStyle ?? string.Empty,
+                YearsExperience = t.YearsExperience ?? 0,
+                IsVerified = t.IsVerified ?? false,
                 t.TutorType,
-                t.AvailableSlots,
-                t.Achievements,
-                Email = t.User.Email,
-                Phone = t.User.PhoneNumber,
-                JoinDate = t.User.CreatedAt,
+                AvailableSlots = t.AvailableSlots != null
+                    ? t.AvailableSlots.Select(a => new AvailableSlotDto { Day = a.Day, Time = a.Time }).ToList()
+                    : new List<AvailableSlotDto>(),
+
+                Achievements = t.Achievements ?? new List<string>(),
+                Email = t.User != null ? (t.User.Email ?? string.Empty) : string.Empty,
+                Phone = t.User != null ? (t.User.PhoneNumber ?? string.Empty) : string.Empty,
+                JoinDate = t.User != null ? t.User.CreatedAt : DateTime.UtcNow,
                 SubjectNames = t.Subjects.Select(s => s.SubjectName).ToList(),
                 TotalReviews = _dbContext.Reviews.Count(r => r.TutorID == t.TutorID),
                 TotalSessions = _dbContext.Classes.Count(c => c.TutorID == t.TutorID)
@@ -140,7 +150,7 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
         if (raw == null)
             return null;
 
-        var reviews = await _dbContext.Reviews
+        var rawReviews = await _dbContext.Reviews
             .AsNoTracking()
             .Where(r => r.TutorID == tutorId)
             .OrderByDescending(r => r.ReviewDate)
@@ -171,7 +181,7 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
             Bio = raw.Bio,
             School = raw.School,
             Degree = raw.Degree,
-            DegreeVerified = raw.IsVerified,
+            DegreeVerified = raw.IsVerified ,
             TranscriptVerified = raw.IsVerified,
             VideoUrl = raw.IntroVideoUrl,
             Rating = raw.AverageRating,
@@ -183,16 +193,16 @@ public class TutorRepository(ApplicationDbContext dbContext) : ITutorRepository
             JoinDate = raw.JoinDate.ToString("yyyy-MM-dd"),
             Location = raw.Location,
             TeachingStyle = raw.TeachingStyle,
-            Achievements = raw.Achievements ?? new List<string>(),
+            Achievements = raw.Achievements,
             Role = raw.TutorType == TutorType.Teacher ? "teacher" : "tutor",
             YearsExperience = raw.YearsExperience,
             CurrentSchool = null,
             PlatformFeeRate = 0m,
-            Reviews = reviews
+            Reviews = rawReviews
         };
     }
 
-    private static List<AvailabilityDayDto> GroupAvailability(List<AvailableSlot>? slots)
+    private static List<AvailabilityDayDto> GroupAvailability(List<AvailableSlotDto>? slots)
     {
         if (slots == null || slots.Count == 0)
             return new List<AvailabilityDayDto>();

@@ -1,8 +1,9 @@
 using UNI_EDU_Backend.Application.DTOs.Tutors;
+using UNI_EDU_Backend.Domain.Models;
 
-namespace UNI_EDU_Backend.Application.Interfaces;
+namespace UNI_EDU_Backend.Application.Interfaces.Repositories;
 
-public interface ITutorRepository
+public interface ITutorRepository : IGenericRepository<Tutor>
 {
     Task<(List<TutorListingResponse> Items, int Total)> SearchAsync(
         TutorSearchQuery query,

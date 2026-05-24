@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UNI_EDU_Backend.Infrastructure;
@@ -12,9 +13,11 @@ using UNI_EDU_Backend.Infrastructure;
 namespace UNI_EDU_Backend.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260524072228_RefactorNullableFields")]
+    partial class RefactorNullableFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -23,36 +26,11 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Class", b =>
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.ClassSession", b =>
                 {
                     b.Property<Guid>("ClassID")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<int>("CompletedSessions")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("EscrowAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("EscrowReleased")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("EscrowStatus")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Format")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("ReleaseMilestone")
-                        .HasColumnType("integer");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("timestamp with time zone");
@@ -66,18 +44,11 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.Property<Guid>("SubjectID")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("TotalSessions")
-                        .HasColumnType("integer");
-
                     b.Property<decimal>("TuitionFee")
                         .HasColumnType("numeric");
 
                     b.Property<Guid>("TutorID")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("WeeklySlots")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
 
                     b.HasKey("ClassID");
 
@@ -87,7 +58,7 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
 
                     b.HasIndex("TutorID");
 
-                    b.ToTable("Classes");
+                    b.ToTable("ClassSessions");
                 });
 
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Exam", b =>
@@ -287,37 +258,6 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.ToTable("Reviews");
                 });
 
-            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Session", b =>
-                {
-                    b.Property<Guid>("SessionID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClassID")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("EndAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Format")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("StartAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.HasKey("SessionID");
-
-                    b.HasIndex("ClassID");
-
-                    b.ToTable("Sessions");
-                });
-
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Student", b =>
                 {
                     b.Property<Guid>("StudentID")
@@ -514,60 +454,7 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Wallet", b =>
-                {
-                    b.Property<Guid>("UserID")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Balance")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("EscrowBalance")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("UserID");
-
-                    b.ToTable("Wallets");
-                });
-
-            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.WalletTransaction", b =>
-                {
-                    b.Property<Guid>("TransactionID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("RelatedClassID")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("UserID")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("TransactionID");
-
-                    b.HasIndex("RelatedClassID");
-
-                    b.HasIndex("UserID");
-
-                    b.ToTable("WalletTransactions");
-                });
-
-            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Class", b =>
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.ClassSession", b =>
                 {
                     b.HasOne("UNI_EDU_Backend.Domain.Models.Student", "Student")
                         .WithMany("Classes")
@@ -665,7 +552,7 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
 
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Review", b =>
                 {
-                    b.HasOne("UNI_EDU_Backend.Domain.Models.Class", "Class")
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.ClassSession", "ClassSession")
                         .WithMany("Reviews")
                         .HasForeignKey("ClassID")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -683,22 +570,11 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Class");
+                    b.Navigation("ClassSession");
 
                     b.Navigation("Reviewer");
 
                     b.Navigation("Tutor");
-                });
-
-            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Session", b =>
-                {
-                    b.HasOne("UNI_EDU_Backend.Domain.Models.Class", "Class")
-                        .WithMany("Sessions")
-                        .HasForeignKey("ClassID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Class");
                 });
 
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Student", b =>
@@ -767,40 +643,9 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.Navigation("Tutor");
                 });
 
-            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Wallet", b =>
-                {
-                    b.HasOne("UNI_EDU_Backend.Domain.Models.User", "User")
-                        .WithOne()
-                        .HasForeignKey("UNI_EDU_Backend.Domain.Models.Wallet", "UserID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.WalletTransaction", b =>
-                {
-                    b.HasOne("UNI_EDU_Backend.Domain.Models.Class", "Class")
-                        .WithMany()
-                        .HasForeignKey("RelatedClassID")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("UNI_EDU_Backend.Domain.Models.Wallet", "Wallet")
-                        .WithMany("Transactions")
-                        .HasForeignKey("UserID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Class");
-
-                    b.Navigation("Wallet");
-                });
-
-            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Class", b =>
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.ClassSession", b =>
                 {
                     b.Navigation("Reviews");
-
-                    b.Navigation("Sessions");
                 });
 
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Exam", b =>
@@ -855,11 +700,6 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
 
                     b.Navigation("Tutor")
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Wallet", b =>
-                {
-                    b.Navigation("Transactions");
                 });
 #pragma warning restore 612, 618
         }
