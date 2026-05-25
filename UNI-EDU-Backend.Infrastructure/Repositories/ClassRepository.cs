@@ -17,6 +17,9 @@ public class ClassRepository(ApplicationDbContext dbContext) : IClassRepository
     public Task<bool> StudentExistsAsync(Guid studentId, CancellationToken cancellationToken) =>
         _dbContext.Students.AnyAsync(s => s.StudentID == studentId, cancellationToken);
 
+    public Task<bool> IsParentOfStudentAsync(Guid parentId, Guid studentId, CancellationToken cancellationToken) =>
+        _dbContext.Students.AnyAsync(s => s.StudentID == studentId && s.ParentID == parentId, cancellationToken);
+
     public Task<string?> GetSubjectNameAsync(Guid subjectId, CancellationToken cancellationToken) =>
         _dbContext.Subjects
             .Where(s => s.SubjectID == subjectId)
@@ -186,4 +189,109 @@ public class ClassRepository(ApplicationDbContext dbContext) : IClassRepository
             "hybrid" => ClassFormat.Hybrid,
             _ => ClassFormat.Online
         };
+
+    public async Task<ClassDetailResponse?> GetByIdAsync(Guid classId, CancellationToken cancellationToken)
+    {
+        // Single roundtrip for the class + denormalized display fields.
+        var raw = await _dbContext.Classes
+            .AsNoTracking()
+            .Where(c => c.ClassID == classId)
+            .Select(c => new
+            {
+                c.ClassID,
+                c.Name,
+                c.TutorID,
+                c.StudentID,
+                c.SubjectID,
+                c.StartDate,
+                c.TuitionFee,
+                c.Status,
+                c.Format,
+                c.WeeklySlots,
+                c.TotalSessions,
+                c.CompletedSessions,
+                c.EscrowAmount,
+                c.EscrowReleased,
+                c.EscrowStatus,
+                c.CreatedAt,
+                c.Subject.SubjectName,
+                TutorName = c.Tutor.FullName,
+                TutorAvatar = c.Tutor.AvatarUrl,
+                c.Tutor.TutorType,
+                StudentName = c.Student.FullName,
+                ParentName = c.Student.Parent != null ? c.Student.Parent.FullName : string.Empty
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (raw == null) return null;
+
+        // Sessions ordered chronologically.
+        var sessions = await _dbContext.Sessions
+            .AsNoTracking()
+            .Where(s => s.ClassID == classId)
+            .OrderBy(s => s.StartAt)
+            .Select(s => new SessionResponse
+            {
+                Id = s.SessionID,
+                ClassId = s.ClassID,
+                StartAt = s.StartAt,
+                EndAt = s.EndAt,
+                Status = s.Status.ToString().ToLowerInvariant(),
+                Format = s.Format.ToString().ToLowerInvariant()
+            })
+            .ToListAsync(cancellationToken);
+
+        // Materials ordered newest-first (matches how the UI usually shows uploads).
+        var materials = await _dbContext.ClassMaterials
+            .AsNoTracking()
+            .Where(m => m.ClassID == classId)
+            .OrderByDescending(m => m.UploadedAt)
+            .Select(m => new MaterialResponse
+            {
+                Id = m.MaterialID,
+                ClassId = m.ClassID,
+                Name = m.Name,
+                Type = m.Type,
+                Url = m.Url,
+                Size = m.Size,
+                UploadedAt = m.UploadedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return new ClassDetailResponse
+        {
+            Id = raw.ClassID,
+            Name = raw.Name,
+            TutorId = raw.TutorID,
+            StudentId = raw.StudentID,
+            SubjectId = raw.SubjectID,
+            Subject = raw.SubjectName,
+            TutorName = raw.TutorName,
+            TutorAvatar = raw.TutorAvatar ?? string.Empty,
+            TutorType = raw.TutorType == TutorType.Teacher ? "teacher" : "tutor",
+            StudentName = raw.StudentName,
+            StudentAvatar = string.Empty, // Student entity has no avatar field today
+            ParentName = raw.ParentName,
+            Format = raw.Format.ToString().ToLowerInvariant(),
+            Fee = raw.TuitionFee,
+            Status = raw.Status.ToString().ToLowerInvariant(),
+            WeeklySlots = (raw.WeeklySlots ?? new List<ClassScheduleSlot>())
+                .Select(s => new WeeklySlotDto
+                {
+                    DayOfWeek = (int)s.DayOfWeek,
+                    StartTime = s.StartTime,
+                    EndTime = s.EndTime
+                })
+                .ToList(),
+            TotalSessions = raw.TotalSessions,
+            CompletedSessions = raw.CompletedSessions,
+            EscrowAmount = raw.EscrowAmount,
+            EscrowReleased = raw.EscrowReleased,
+            EscrowStatus = raw.EscrowStatus.ToString().ToLowerInvariant(),
+            CreatedAt = raw.CreatedAt,
+            StartDate = raw.StartDate,
+            Sessions = sessions,
+            Materials = materials
+        };
+    }
 }

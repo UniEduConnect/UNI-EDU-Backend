@@ -1,7 +1,10 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UNI_EDU_Backend.API.Commons;
 using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.Services.Classes;
+using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
 
 namespace UNI_EDU_Backend.API.Controllers;
 
@@ -12,11 +15,12 @@ public class ClassesController(IClassService classService) : ControllerBase
     private readonly IClassService _classService = classService;
 
     [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Create([FromBody] CreateClassRequest request, CancellationToken cancellationToken)
     {
-        // TODO: Catch studentId, parentId through token
+        var (userId, role) = ReadCallerOrThrow();
 
-        ClassResponse result = await _classService.CreateClassAsync(request, cancellationToken);
+        ClassResponse result = await _classService.CreateClassAsync(request, userId, role, cancellationToken);
 
         ApiResponse<ClassResponse> apiResponse = new()
         {
@@ -26,5 +30,36 @@ public class ClassesController(IClassService classService) : ControllerBase
         };
 
         return StatusCode(StatusCodes.Status201Created, apiResponse);
+    }
+
+    [HttpGet("{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
+    {
+        var (userId, role) = ReadCallerOrThrow();
+
+        ClassDetailResponse result = await _classService.GetClassByIdAsync(id, userId, role, cancellationToken);
+
+        ApiResponse<ClassDetailResponse> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get class successfully",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
+
+    private (Guid UserId, string Role) ReadCallerOrThrow()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? throw new UnauthorizedAccessException("Missing user identifier claim.");
+        if (!Guid.TryParse(userIdClaim, out var userId))
+            throw new UnauthorizedAccessException("Invalid user identifier claim.");
+
+        var role = User.FindFirst(ClaimTypes.Role)?.Value
+            ?? throw new UnauthorizedAccessException("Missing role claim.");
+
+        return (userId, role);
     }
 }
