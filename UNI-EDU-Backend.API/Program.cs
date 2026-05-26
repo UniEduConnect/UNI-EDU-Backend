@@ -140,8 +140,12 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
+    app.UseStaticFiles();
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.InjectJavascript("/swagger-auth.js");
+    });
 }
 
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
