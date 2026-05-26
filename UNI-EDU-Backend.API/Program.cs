@@ -9,6 +9,7 @@ using UNI_EDU_Backend.API.Middleware;
 using UNI_EDU_Backend.Application.Mappings;
 using UNI_EDU_Backend.API.Json;
 using UNI_EDU_Backend.Application.Services.Classes;
+using UNI_EDU_Backend.Application.Services.Parents;
 using UNI_EDU_Backend.Application.Services.Tutors;
 using UNI_EDU_Backend.Application.Services.Users;
 using UNI_EDU_Backend.Infrastructure;
@@ -44,6 +45,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ITutorService, TutorService>();
 builder.Services.AddScoped<IClassService, ClassService>();
+builder.Services.AddScoped<IParentService, ParentService>();
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
