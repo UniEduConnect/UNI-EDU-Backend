@@ -69,9 +69,9 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
                 t.School,
                 t.Degree,
                 t.TutorType,
-                AvailableSlots = t.AvailableSlots != null
-                    ? t.AvailableSlots.Select(a => new AvailableSlotDto { Day = a.Day, Time = a.Time }).ToList()
-                    : new List<AvailableSlotDto>(),
+                // EF cannot translate operations over the jsonb-converted list — pull it raw
+                // and map to DTOs client-side via MapSlots after materialization.
+                t.AvailableSlots,
 
                 Certificates = t.Certificates ?? new List<string>(),
                 IntroVideoUrl = t.IntroVideoUrl ?? string.Empty,
@@ -97,7 +97,7 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
             School = t.School,
             Degree = t.Degree,
             Type = t.TutorType == TutorType.Teacher ? "teacher" : "tutor",
-            AvailableSlots = t.AvailableSlots,
+            AvailableSlots = MapSlots(t.AvailableSlots),
             Certificates = t.Certificates,
             IntroVideoUrl = t.IntroVideoUrl,
             TeachingStyle = t.TeachingStyle,
@@ -133,9 +133,9 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
                 YearsExperience = t.YearsExperience ?? 0,
                 IsVerified = t.IsVerified ?? false,
                 t.TutorType,
-                AvailableSlots = t.AvailableSlots != null
-                    ? t.AvailableSlots.Select(a => new AvailableSlotDto { Day = a.Day, Time = a.Time }).ToList()
-                    : new List<AvailableSlotDto>(),
+                // EF cannot translate operations over the jsonb-converted list — pull it raw
+                // and map to DTOs client-side via MapSlots after materialization.
+                t.AvailableSlots,
 
                 Achievements = t.Achievements ?? new List<string>(),
                 Email = t.User != null ? (t.User.Email ?? string.Empty) : string.Empty,
@@ -189,7 +189,7 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
             TotalSessions = raw.TotalSessions,
             TestPassRate = 0,
             HourlyRate = raw.HourlyRate,
-            Availability = GroupAvailability(raw.AvailableSlots),
+            Availability = GroupAvailability(MapSlots(raw.AvailableSlots)),
             JoinDate = raw.JoinDate.ToString("yyyy-MM-dd"),
             Location = raw.Location,
             TeachingStyle = raw.TeachingStyle,

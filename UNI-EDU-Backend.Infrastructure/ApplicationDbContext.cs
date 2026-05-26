@@ -169,16 +169,25 @@ namespace UNI_EDU_Backend.Infrastructure
                 .Property(t => t.AvailableSlots)
                 .HasColumnType("jsonb")
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v ?? new List<AvailableSlot>(), (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Serialize(v ?? new List<AvailableSlot>(), JsonbOptions),
                     v => DeserializeJsonList<AvailableSlot>(v));
 
             modelBuilder.Entity<Class>()
                 .Property(c => c.WeeklySlots)
                 .HasColumnType("jsonb")
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v ?? new List<ClassScheduleSlot>(), (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Serialize(v ?? new List<ClassScheduleSlot>(), JsonbOptions),
                     v => DeserializeJsonList<ClassScheduleSlot>(v));
         }
+
+        // Shared options for jsonb columns. camelCase naming matches the on-disk shape
+        // already in the DB (e.g. {"day":"Mon","time":"18:00-20:00"}); case-insensitive
+        // matching means we still read rows that were written with PascalCase keys.
+        private static readonly JsonSerializerOptions JsonbOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
 
         // Defensive: tolerate empty/null/malformed jsonb values (e.g. '""', 'null', NULL) by
         // returning an empty list instead of throwing during materialization.
@@ -187,7 +196,7 @@ namespace UNI_EDU_Backend.Infrastructure
             if (string.IsNullOrWhiteSpace(raw)) return new List<T>();
             try
             {
-                return JsonSerializer.Deserialize<List<T>>(raw, (JsonSerializerOptions?)null) ?? new List<T>();
+                return JsonSerializer.Deserialize<List<T>>(raw, JsonbOptions) ?? new List<T>();
             }
             catch (JsonException)
             {
