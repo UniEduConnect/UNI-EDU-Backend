@@ -17,6 +17,8 @@ using UNI_EDU_Backend.Infrastructure.Repositories;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Application.Services.Auths;
 using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Exceptions;
+using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -112,26 +114,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ClockSkew = TimeSpan.FromSeconds(30) // small tolerance for host/container time drift
         };
 
-        // Diagnostic: surface why JWT validation fails (token expired, bad signature, missing header, ...).
-        // Remove or silence in production.
         options.Events = new JwtBearerEvents
         {
-            OnAuthenticationFailed = ctx =>
-            {
-                Console.Error.WriteLine($"[JWT] Auth failed: {ctx.Exception.GetType().Name} — {ctx.Exception.Message}");
-                return Task.CompletedTask;
-            },
             OnChallenge = ctx =>
             {
-                Console.Error.WriteLine($"[JWT] Challenge: error='{ctx.Error}' description='{ctx.ErrorDescription}'");
-                return Task.CompletedTask;
+                // Suppress the default empty 401 so the thrown exception reaches GlobalExceptionHandlerMiddleware.
+                ctx.HandleResponse();
+                var message = !string.IsNullOrWhiteSpace(ctx.ErrorDescription)
+                    ? ctx.ErrorDescription
+                    : "Authentication is required to access this resource.";
+                throw new UnauthorizedAccessException(message);
             },
-            OnMessageReceived = ctx =>
+            OnForbidden = ctx =>
             {
-                var hasHeader = ctx.Request.Headers.ContainsKey("Authorization");
-                if (!hasHeader)
-                    Console.Error.WriteLine($"[JWT] Incoming request to {ctx.Request.Path} has NO Authorization header.");
-                return Task.CompletedTask;
+                throw new ForbiddenAccessException("You do not have permission to access this resource.");
             }
         };
     });

@@ -85,13 +85,13 @@ Project: **`UNI-EDU-Backend.Infrastructure`**.
   - Vietnamese phone number rule (re-use across DTOs): `Matches("^0\\d{9}$")` — starts with `0`, exactly 10 digits, no `+84` form.
   - For Guid required fields: `NotEmpty()` (Guid.Empty is the default and fails this).
   - Paged-query validators: `Page >= 1`, `MinPrice >= 0`, `MaxPrice >= MinPrice`, enum-ish strings against an allow-list.
-- Map between DTOs and entities via **AutoMapper** profiles in `Application/Mappings/MappingProfile.cs` — add a `CreateMap<Entity, Dto>()` line there. Mapster is in the csproj but unused; don't introduce new `.Adapt<>()` calls.
+- Map between DTOs and entities with **Mapster** — call `entity.Adapt<TDto>()` (or `dto.Adapt<TEntity>()`) directly in the service. Don't inject `IMapper` and don't add `CreateMap` lines to `MappingProfile.cs` for new code. If you need a non-default rule (renamed members, ignored properties, computed values), register a `TypeAdapterConfig<TSrc, TDst>.NewConfig()...` in a static initializer under `Application/Mappings/` — but the convention-based map is enough for most DTOs.
 
 ## Step 6 — Application: service interface + implementation
 
 - Folder: `Application/Services/<Feature>/`.
 - Files: `I<Feature>Service.cs`, `<Feature>Service.cs`.
-- Use primary-constructor syntax. Inject the repo, the validators you need (`IValidator<Create<Feature>Request>` etc.), `IMapper`, `IUnitOfWork` if multi-step.
+- Use primary-constructor syntax. Inject the repo, the validators you need (`IValidator<Create<Feature>Request>` etc.), and `IUnitOfWork` if multi-step. **Do not inject `IMapper`** — use Mapster's `.Adapt<>()` extension instead.
 - **Order inside a service method**:
   1. Resolve/normalize caller identity (if the method takes `callerUserId` + `callerRole`) — switch on role, set body fields the caller doesn't own (e.g. for `Student` role, override `request.StudentId = callerUserId`), and throw `ForbiddenAccessException` for roles that aren't allowed.
   2. `await _validator.EnsureValidAsync(request, ct);` — **after** identity resolution so we don't validate a request the caller isn't allowed to make at all, but **before** any existence checks.
@@ -132,7 +132,7 @@ builder.Services.AddScoped<I<Feature>Repository, <Feature>Repository>();
 builder.Services.AddScoped<I<Feature>Service, <Feature>Service>();
 ```
 
-If you added a new AutoMapper profile, it's already picked up via `AddAutoMapper(typeof(MappingProfile))` as long as you put the maps inside that one profile.
+Mapster needs no per-feature DI registration. If you added a custom `TypeAdapterConfig<TSrc, TDst>.NewConfig()` block, make sure it runs at startup (a static constructor on a `MappingRegistry` class invoked from `Program.cs`, or `TypeAdapterConfig.GlobalSettings.Scan(assembly)` for `IRegister` implementations) — otherwise the runtime falls back to convention-based mapping and your custom rule won't fire.
 
 ## Step 9 — Verify before reporting done
 
