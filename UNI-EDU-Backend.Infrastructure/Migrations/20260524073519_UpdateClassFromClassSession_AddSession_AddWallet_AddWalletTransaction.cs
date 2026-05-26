@@ -18,9 +18,7 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
             migrationBuilder.DropTable(
                 name: "ClassSessions");
 
-            migrationBuilder.DropColumn(
-                name: "Address",
-                table: "Tutors");
+            // Note: "Address" column on "Tutors" is already dropped by the earlier RefactorTutor migration.
 
             migrationBuilder.CreateTable(
                 name: "Classes",
@@ -197,12 +195,7 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
             migrationBuilder.DropTable(
                 name: "Wallets");
 
-            migrationBuilder.AddColumn<string>(
-                name: "Address",
-                table: "Tutors",
-                type: "text",
-                nullable: false,
-                defaultValue: "");
+            // Note: "Address" column re-creation is the responsibility of the RefactorTutor Down() method.
 
             migrationBuilder.CreateTable(
                 name: "ClassSessions",

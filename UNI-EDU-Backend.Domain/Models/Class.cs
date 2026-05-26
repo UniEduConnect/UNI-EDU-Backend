@@ -40,5 +40,6 @@ namespace UNI_EDU_Backend.Domain.Models
         public virtual Subject Subject { get; set; }
         public virtual ICollection<Review> Reviews { get; set; }
         public virtual ICollection<Session> Sessions { get; set; } = new List<Session>();
+        public virtual ICollection<ClassMaterial> Materials { get; set; } = new List<ClassMaterial>();
     }
 }

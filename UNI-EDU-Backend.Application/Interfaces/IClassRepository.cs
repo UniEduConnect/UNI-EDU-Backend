@@ -9,4 +9,8 @@ public interface IClassRepository
     Task<string?> GetSubjectNameAsync(Guid subjectId, CancellationToken cancellationToken);
 
     Task<ClassResponse> CreateClassWithEscrowAsync(CreateClassRequest request, CancellationToken cancellationToken);
+
+    Task<ClassDetailResponse?> GetByIdAsync(Guid classId, CancellationToken cancellationToken);
+
+    Task<bool> IsParentOfStudentAsync(Guid parentId, Guid studentId, CancellationToken cancellationToken);
 }

@@ -27,6 +27,7 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<Wallet> Wallets { get; set; }
         public DbSet<WalletTransaction> WalletTransactions { get; set; }
         public DbSet<Session> Sessions { get; set; }
+        public DbSet<ClassMaterial> ClassMaterials { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -148,6 +149,13 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasForeignKey(s => s.ClassID)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // ClassMaterial child of Class (cascade)
+            modelBuilder.Entity<ClassMaterial>()
+                .HasOne(m => m.Class)
+                .WithMany(c => c.Materials)
+                .HasForeignKey(m => m.ClassID)
+                .OnDelete(DeleteBehavior.Cascade);
+
             // Postgres array / jsonb columns on Tutor
             modelBuilder.Entity<Tutor>()
                 .Property(t => t.Certificates)
@@ -161,15 +169,30 @@ namespace UNI_EDU_Backend.Infrastructure
                 .Property(t => t.AvailableSlots)
                 .HasColumnType("jsonb")
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<List<AvailableSlot>>(v, (JsonSerializerOptions?)null) ?? new List<AvailableSlot>());
+                    v => JsonSerializer.Serialize(v ?? new List<AvailableSlot>(), (JsonSerializerOptions?)null),
+                    v => DeserializeJsonList<AvailableSlot>(v));
 
             modelBuilder.Entity<Class>()
                 .Property(c => c.WeeklySlots)
                 .HasColumnType("jsonb")
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<List<ClassScheduleSlot>>(v, (JsonSerializerOptions?)null) ?? new List<ClassScheduleSlot>());
+                    v => JsonSerializer.Serialize(v ?? new List<ClassScheduleSlot>(), (JsonSerializerOptions?)null),
+                    v => DeserializeJsonList<ClassScheduleSlot>(v));
+        }
+
+        // Defensive: tolerate empty/null/malformed jsonb values (e.g. '""', 'null', NULL) by
+        // returning an empty list instead of throwing during materialization.
+        private static List<T> DeserializeJsonList<T>(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return new List<T>();
+            try
+            {
+                return JsonSerializer.Deserialize<List<T>>(raw, (JsonSerializerOptions?)null) ?? new List<T>();
+            }
+            catch (JsonException)
+            {
+                return new List<T>();
+            }
         }
     }
 }
