@@ -190,6 +190,85 @@ public class ClassRepository(ApplicationDbContext dbContext) : IClassRepository
             _ => ClassFormat.Online
         };
 
+    public async Task<(List<ClassListItemResponse> Items, int Total)> GetMyClassesAsync(
+        Guid callerUserId, string callerRole, ClassStatus? status, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var query = _dbContext.Classes.AsNoTracking().AsQueryable();
+
+        // Role scoping. Admin sees all; unknown roles already rejected by the service.
+        query = callerRole switch
+        {
+            "Tutor" => query.Where(c => c.TutorID == callerUserId),
+            "Student" => query.Where(c => c.StudentID == callerUserId),
+            "Parent" => query.Where(c => c.Student.ParentID == callerUserId),
+            _ => query
+        };
+
+        if (status.HasValue)
+            query = query.Where(c => c.Status == status.Value);
+
+        var total = await query.CountAsync(cancellationToken);
+        var skip = (page - 1) * pageSize;
+
+        // Pull WeeklySlots raw (jsonb-converted) — map to DTOs client-side after materialization.
+        var raw = await query
+            .OrderByDescending(c => c.CreatedAt)
+            .ThenBy(c => c.ClassID)
+            .Skip(skip)
+            .Take(pageSize)
+            .Select(c => new
+            {
+                c.ClassID,
+                c.Name,
+                c.TutorID,
+                c.StudentID,
+                c.SubjectID,
+                SubjectName = c.Subject.SubjectName,
+                TutorName = c.Tutor.FullName,
+                TutorAvatar = c.Tutor.AvatarUrl,
+                StudentName = c.Student.FullName,
+                c.Status,
+                c.Format,
+                c.TuitionFee,
+                c.TotalSessions,
+                c.CompletedSessions,
+                c.StartDate,
+                c.CreatedAt,
+                c.WeeklySlots
+            })
+            .ToListAsync(cancellationToken);
+
+        var items = raw.Select(c => new ClassListItemResponse
+        {
+            Id = c.ClassID,
+            Name = c.Name,
+            TutorId = c.TutorID,
+            StudentId = c.StudentID,
+            SubjectId = c.SubjectID,
+            Subject = c.SubjectName,
+            TutorName = c.TutorName,
+            TutorAvatar = c.TutorAvatar ?? string.Empty,
+            StudentName = c.StudentName,
+            Status = c.Status.ToString().ToLowerInvariant(),
+            Format = c.Format.ToString().ToLowerInvariant(),
+            Fee = c.TuitionFee,
+            TotalSessions = c.TotalSessions,
+            CompletedSessions = c.CompletedSessions,
+            StartDate = c.StartDate,
+            CreatedAt = c.CreatedAt,
+            WeeklySlots = (c.WeeklySlots ?? new List<ClassScheduleSlot>())
+                .Select(s => new WeeklySlotDto
+                {
+                    DayOfWeek = (int)s.DayOfWeek,
+                    StartTime = s.StartTime,
+                    EndTime = s.EndTime
+                })
+                .ToList()
+        }).ToList();
+
+        return (items, total);
+    }
+
     public async Task<ClassDetailResponse?> GetByIdAsync(Guid classId, CancellationToken cancellationToken)
     {
         // Single roundtrip for the class + denormalized display fields.

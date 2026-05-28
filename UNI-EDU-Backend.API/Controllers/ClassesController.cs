@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UNI_EDU_Backend.API.Commons;
+using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.Services.Classes;
 using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
@@ -30,6 +31,24 @@ public class ClassesController(IClassService classService) : ControllerBase
         };
 
         return StatusCode(StatusCodes.Status201Created, apiResponse);
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetMyClasses([FromQuery] ClassListQuery query, CancellationToken cancellationToken)
+    {
+        var (userId, role) = ReadCallerOrThrow();
+
+        PagedResult<ClassListItemResponse> result = await _classService.GetMyClassesAsync(query, userId, role, cancellationToken);
+
+        ApiResponse<PagedResult<ClassListItemResponse>> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get classes successfully",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
     }
 
     [HttpGet("{id:guid}")]
