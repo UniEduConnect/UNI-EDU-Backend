@@ -69,6 +69,22 @@ public class ClassesController(IClassService classService) : ControllerBase
         return StatusCode(StatusCodes.Status200OK, apiResponse);
     }
 
+    [HttpPatch("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateClassRequest request, CancellationToken cancellationToken)
+    {
+        ClassDetailResponse result = await _classService.UpdateClassAsync(id, request, cancellationToken);
+
+        ApiResponse<ClassDetailResponse> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Class updated successfully",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
+
     private (Guid UserId, string Role) ReadCallerOrThrow()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value

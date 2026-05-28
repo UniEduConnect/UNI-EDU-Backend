@@ -10,13 +10,15 @@ namespace UNI_EDU_Backend.Application.Services.Classes;
 public class ClassService(
     IClassRepository classRepo,
     IValidator<CreateClassRequest> createValidator,
-    IValidator<ClassListQuery> listValidator) : IClassService
+    IValidator<ClassListQuery> listValidator,
+    IValidator<UpdateClassRequest> updateValidator) : IClassService
 {
     private const int PageSize = 10;
 
     private readonly IClassRepository _classRepo = classRepo;
     private readonly IValidator<CreateClassRequest> _createValidator = createValidator;
     private readonly IValidator<ClassListQuery> _listValidator = listValidator;
+    private readonly IValidator<UpdateClassRequest> _updateValidator = updateValidator;
 
     public async Task<ClassResponse> CreateClassAsync(CreateClassRequest request, Guid callerUserId, string callerRole, CancellationToken cancellationToken)
     {
@@ -102,6 +104,23 @@ public class ClassService(
             Page = query.Page,
             PageSize = PageSize
         };
+    }
+
+    public async Task<ClassDetailResponse> UpdateClassAsync(Guid classId, UpdateClassRequest request, CancellationToken cancellationToken)
+    {
+        // Admin-only: enforced by [Authorize(Roles = "Admin")] on the controller action.
+        await _updateValidator.EnsureValidAsync(request, cancellationToken);
+
+        // Validator restricts status to searching/active/paused — completed/cancelled are rejected
+        // there because they move escrow and belong to the settlement flow.
+        var status = ParseStatus(request.Status);
+
+        var found = await _classRepo.UpdatePartialAsync(classId, request.Name, status, cancellationToken);
+        if (!found)
+            throw new NotFoundException($"Class with id '{classId}' not found.");
+
+        return await _classRepo.GetByIdAsync(classId, cancellationToken)
+            ?? throw new NotFoundException($"Class with id '{classId}' not found.");
     }
 
     // Validator already guarantees the value is in the allowed set (or empty); parse defensively.
