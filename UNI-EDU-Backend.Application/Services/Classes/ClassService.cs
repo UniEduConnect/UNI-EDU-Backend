@@ -3,13 +3,20 @@ using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.Exceptions;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
+using UNI_EDU_Backend.Domain.Enums;
 
 namespace UNI_EDU_Backend.Application.Services.Classes;
 
-public class ClassService(IClassRepository classRepo, IValidator<CreateClassRequest> createValidator) : IClassService
+public class ClassService(
+    IClassRepository classRepo,
+    IValidator<CreateClassRequest> createValidator,
+    IValidator<ClassListQuery> listValidator) : IClassService
 {
+    private const int PageSize = 10;
+
     private readonly IClassRepository _classRepo = classRepo;
     private readonly IValidator<CreateClassRequest> _createValidator = createValidator;
+    private readonly IValidator<ClassListQuery> _listValidator = listValidator;
 
     public async Task<ClassResponse> CreateClassAsync(CreateClassRequest request, Guid callerUserId, string callerRole, CancellationToken cancellationToken)
     {
@@ -74,5 +81,35 @@ public class ClassService(IClassRepository classRepo, IValidator<CreateClassRequ
             throw new ForbiddenAccessException("You do not have access to this class.");
 
         return detail;
+    }
+
+    public async Task<PagedResult<ClassListItemResponse>> GetMyClassesAsync(ClassListQuery query, Guid callerUserId, string callerRole, CancellationToken cancellationToken)
+    {
+        await _listValidator.EnsureValidAsync(query, cancellationToken);
+
+        var role = (callerRole ?? string.Empty).Trim();
+        if (role is not ("Tutor" or "Student" or "Parent" or "Admin"))
+            throw new ForbiddenAccessException("Your role cannot list classes.");
+
+        var status = ParseStatus(query.Status);
+
+        var (items, total) = await _classRepo.GetMyClassesAsync(callerUserId, role, status, query.Page, PageSize, cancellationToken);
+
+        return new PagedResult<ClassListItemResponse>
+        {
+            Items = items,
+            Total = total,
+            Page = query.Page,
+            PageSize = PageSize
+        };
+    }
+
+    // Validator already guarantees the value is in the allowed set (or empty); parse defensively.
+    private static ClassStatus? ParseStatus(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        return Enum.TryParse<ClassStatus>(raw.Trim(), ignoreCase: true, out var parsed)
+            ? parsed
+            : throw new BadRequestException($"Invalid status '{raw}'.");
     }
 }
