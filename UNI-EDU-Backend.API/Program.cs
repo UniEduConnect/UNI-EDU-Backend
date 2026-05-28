@@ -54,15 +54,19 @@ builder.Services.AddAutoMapper(typeof(MappingProfile));
 var assemblyApplication = typeof(UNI_EDU_Backend.Application.IAssemblyReference).Assembly;
 builder.Services.AddValidatorsFromAssembly(assemblyApplication);
 
-Env.Load("../.env");
+var envPath = Path.Combine(Directory.GetCurrentDirectory(), "..", ".env");
+if (File.Exists(envPath))
+    Env.Load(envPath);
+
 builder.Configuration.AddEnvironmentVariables();
-var db = Env.GetString("POSTGRES_DB");
-var user = Env.GetString("POSTGRES_USER");
-var pass = Env.GetString("POSTGRES_PASSWORD");
-var host = Env.GetString("POSTGRES_HOST") ?? "localhost";
-var port = Env.GetString("POSTGRES_PORT") ?? "5432";
+
+var db = Env.GetString("POSTGRES_DB") ?? builder.Configuration["POSTGRES_DB"];
+var user = Env.GetString("POSTGRES_USER") ?? builder.Configuration["POSTGRES_USER"];
+var pass = Env.GetString("POSTGRES_PASSWORD") ?? builder.Configuration["POSTGRES_PASSWORD"];
+var host = Env.GetString("POSTGRES_HOST") ?? builder.Configuration["POSTGRES_HOST"] ?? "localhost";
+var port = Env.GetString("POSTGRES_PORT") ?? builder.Configuration["POSTGRES_PORT"] ?? "5432";
 var connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};";
-builder.Services.AddDbContext<ApplicationDbContext>(options => 
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 // Enable Swagger
@@ -89,10 +93,13 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 
+var allowedOrigins = builder.Configuration["ALLOWED_ORIGINS"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    ?? ["http://localhost:3000", "http://localhost:8080"];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins("http://localhost:3000", "http://localhost:8080")
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());
@@ -134,14 +141,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.UseStaticFiles();
+
+var enableSwagger = app.Environment.IsDevelopment()
+    || string.Equals(app.Configuration["ENABLE_SWAGGER"], "true", StringComparison.OrdinalIgnoreCase);
+
+if (enableSwagger)
 {
-    app.UseStaticFiles();
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.InjectJavascript("/swagger-auth.js");
     });
+}
+
+if (string.Equals(app.Configuration["AUTO_MIGRATE"], "true", StringComparison.OrdinalIgnoreCase))
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    dbContext.Database.Migrate();
 }
 
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
