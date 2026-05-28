@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UNI_EDU_Backend.API.Commons;
+using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Wallets;
 using UNI_EDU_Backend.Application.Services.Wallets;
 using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
@@ -26,6 +27,24 @@ public class WalletController(IWalletService walletService) : ControllerBase
         {
             StatusCode = StatusCodes.Status200OK,
             Message = "Get wallet successfully",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
+
+    [HttpGet("transactions")]
+    [Authorize]
+    public async Task<IActionResult> GetMyTransactions([FromQuery] TransactionListQuery query, CancellationToken cancellationToken)
+    {
+        var (userId, role) = ReadCallerOrThrow();
+
+        PagedResult<TransactionResponse> result = await _walletService.GetMyTransactionsAsync(query, userId, role, cancellationToken);
+
+        ApiResponse<PagedResult<TransactionResponse>> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get transactions successfully",
             Data = result
         };
 
