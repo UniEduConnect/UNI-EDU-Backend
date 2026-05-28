@@ -12,6 +12,7 @@ using UNI_EDU_Backend.Application.Services.Classes;
 using UNI_EDU_Backend.Application.Services.Parents;
 using UNI_EDU_Backend.Application.Services.Tutors;
 using UNI_EDU_Backend.Application.Services.Users;
+using UNI_EDU_Backend.Application.Services.Wallets;
 using UNI_EDU_Backend.Infrastructure;
 using UNI_EDU_Backend.Infrastructure.Repositories;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
@@ -40,6 +41,7 @@ builder.Services.AddScoped<ITutorRepository, TutorRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IClassRepository, ClassRepository>();
+builder.Services.AddScoped<IWalletRepository, WalletRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 //Services
@@ -48,6 +50,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ITutorService, TutorService>();
 builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<IParentService, ParentService>();
+builder.Services.AddScoped<IWalletService, WalletService>();
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
