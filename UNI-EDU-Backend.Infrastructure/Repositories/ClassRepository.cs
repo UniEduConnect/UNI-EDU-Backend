@@ -269,6 +269,20 @@ public class ClassRepository(ApplicationDbContext dbContext) : IClassRepository
         return (items, total);
     }
 
+    public async Task<bool> UpdatePartialAsync(Guid classId, string? name, ClassStatus? status, CancellationToken cancellationToken)
+    {
+        var entity = await _dbContext.Classes
+            .FirstOrDefaultAsync(c => c.ClassID == classId, cancellationToken);
+
+        if (entity is null) return false;
+
+        if (name is not null) entity.Name = name.Trim();
+        if (status.HasValue) entity.Status = status.Value;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<ClassDetailResponse?> GetByIdAsync(Guid classId, CancellationToken cancellationToken)
     {
         // Single roundtrip for the class + denormalized display fields.
