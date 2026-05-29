@@ -15,5 +15,16 @@ namespace UNI_EDU_Backend.Application.Interfaces.Repositories
         // (for the parent view); null when the transaction has no related class.
         Task<(List<WalletTransactionRow> Items, int Total)> GetTransactionsAsync(
             Guid userId, int page, int pageSize, CancellationToken cancellationToken);
+
+        // Creates the Wallet row if missing (balance 0), then inserts a Pending deposit
+        // transaction. Does NOT credit the balance. Returns the new transaction id.
+        Task<Guid> CreatePendingDepositAsync(
+            Guid userId, decimal amount, string method, string orderId, string description, CancellationToken cancellationToken);
+
+        // Idempotently applies a provider result to the pending deposit identified by orderId.
+        // On success (and matching amount) flips Pending→Completed and credits the balance,
+        // all inside one DB transaction. Safe to call repeatedly (webhook retries).
+        Task<DepositSettleOutcome> SettleDepositAsync(
+            string orderId, bool success, string providerTxnId, decimal confirmedAmount, CancellationToken cancellationToken);
     }
 }

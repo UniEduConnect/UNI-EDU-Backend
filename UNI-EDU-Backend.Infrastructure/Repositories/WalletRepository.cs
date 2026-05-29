@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.Application.DTOs.Wallets;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
+using UNI_EDU_Backend.Domain.Enums;
+using UNI_EDU_Backend.Domain.Models;
 
 namespace UNI_EDU_Backend.Infrastructure.Repositories;
 
@@ -49,5 +51,86 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
             .ToListAsync(cancellationToken);
 
         return (items, total);
+    }
+
+    public async Task<Guid> CreatePendingDepositAsync(
+        Guid userId, decimal amount, string method, string orderId, string description, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+
+        // WalletTransaction.UserID has an FK to Wallet — ensure the wallet row exists (balance 0).
+        var wallet = await _dbContext.Wallets.FirstOrDefaultAsync(w => w.UserID == userId, cancellationToken);
+        if (wallet is null)
+        {
+            wallet = new Wallet { UserID = userId, Balance = 0m, EscrowBalance = 0m, UpdatedAt = now };
+            _dbContext.Wallets.Add(wallet);
+        }
+
+        var tx = new WalletTransaction
+        {
+            TransactionID = Guid.NewGuid(),
+            UserID = userId,
+            Type = WalletTxType.Deposit,
+            Status = WalletTxStatus.Pending,
+            Amount = amount,
+            Method = method,
+            ProviderRef = orderId,
+            Description = description,
+            CreatedAt = now
+        };
+        _dbContext.WalletTransactions.Add(tx);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return tx.TransactionID;
+    }
+
+    public async Task<DepositSettleOutcome> SettleDepositAsync(
+        string orderId, bool success, string providerTxnId, decimal confirmedAmount, CancellationToken cancellationToken)
+    {
+        await using var dbTx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var tx = await _dbContext.WalletTransactions
+            .FirstOrDefaultAsync(t => t.ProviderRef == orderId && t.Type == WalletTxType.Deposit, cancellationToken);
+
+        if (tx is null)
+            return DepositSettleOutcome.NotFound;
+
+        // Idempotency: only a still-Pending deposit may transition. Retries are no-ops.
+        if (tx.Status != WalletTxStatus.Pending)
+            return DepositSettleOutcome.AlreadySettled;
+
+        tx.ProviderTxnId = providerTxnId;
+
+        if (!success)
+        {
+            tx.Status = WalletTxStatus.Failed;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbTx.CommitAsync(cancellationToken);
+            return DepositSettleOutcome.Failed;
+        }
+
+        // Trust the provider's confirmed amount — never credit if it disagrees with what we recorded.
+        if (tx.Amount != confirmedAmount)
+        {
+            tx.Status = WalletTxStatus.Failed;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbTx.CommitAsync(cancellationToken);
+            return DepositSettleOutcome.AmountMismatch;
+        }
+
+        var wallet = await _dbContext.Wallets.FirstOrDefaultAsync(w => w.UserID == tx.UserID, cancellationToken);
+        if (wallet is null)
+        {
+            wallet = new Wallet { UserID = tx.UserID, Balance = 0m, EscrowBalance = 0m, UpdatedAt = DateTime.UtcNow };
+            _dbContext.Wallets.Add(wallet);
+        }
+
+        wallet.Balance += confirmedAmount;
+        wallet.UpdatedAt = DateTime.UtcNow;
+        tx.Status = WalletTxStatus.Completed;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await dbTx.CommitAsync(cancellationToken);
+        return DepositSettleOutcome.Credited;
     }
 }

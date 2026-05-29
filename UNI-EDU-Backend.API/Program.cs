@@ -14,6 +14,7 @@ using UNI_EDU_Backend.Application.Services.Tutors;
 using UNI_EDU_Backend.Application.Services.Users;
 using UNI_EDU_Backend.Application.Services.Wallets;
 using UNI_EDU_Backend.Infrastructure;
+using UNI_EDU_Backend.Infrastructure.Payments;
 using UNI_EDU_Backend.Infrastructure.Repositories;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Application.Services.Auths;
@@ -51,6 +52,12 @@ builder.Services.AddScoped<ITutorService, TutorService>();
 builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<IParentService, ParentService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
+
+// Payment gateways (Momo). Settings bound from the "Momo" config section / Momo__* env vars.
+builder.Services.Configure<MomoOptions>(builder.Configuration.GetSection("Momo"));
+builder.Services.AddHttpClient<MomoGateway>();
+builder.Services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<MomoGateway>());
+builder.Services.AddScoped<IMomoGateway>(sp => sp.GetRequiredService<MomoGateway>());
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 

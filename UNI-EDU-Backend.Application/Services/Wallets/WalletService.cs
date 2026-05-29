@@ -1,6 +1,8 @@
 using FluentValidation;
 using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Wallets;
+using UNI_EDU_Backend.Application.Exceptions;
+using UNI_EDU_Backend.Application.Interfaces;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Enums;
 
@@ -8,12 +10,18 @@ namespace UNI_EDU_Backend.Application.Services.Wallets;
 
 public class WalletService(
     IWalletRepository walletRepo,
-    IValidator<TransactionListQuery> transactionsValidator) : IWalletService
+    IValidator<TransactionListQuery> transactionsValidator,
+    IValidator<DepositRequest> depositValidator,
+    IEnumerable<IPaymentGateway> paymentGateways,
+    IMomoGateway momoGateway) : IWalletService
 {
     private const int PageSize = 10;
 
     private readonly IWalletRepository _walletRepo = walletRepo;
     private readonly IValidator<TransactionListQuery> _transactionsValidator = transactionsValidator;
+    private readonly IValidator<DepositRequest> _depositValidator = depositValidator;
+    private readonly IEnumerable<IPaymentGateway> _paymentGateways = paymentGateways;
+    private readonly IMomoGateway _momoGateway = momoGateway;
 
     public async Task<WalletResponse> GetMyWalletAsync(Guid callerUserId, string callerRole, CancellationToken cancellationToken)
     {
@@ -71,6 +79,49 @@ public class WalletService(
             Page = query.Page,
             PageSize = PageSize
         };
+    }
+
+    public async Task<DepositResponse> InitiateDepositAsync(DepositRequest request, Guid callerUserId, CancellationToken cancellationToken)
+    {
+        await _depositValidator.EnsureValidAsync(request, cancellationToken);
+
+        var method = request.Method.Trim().ToLowerInvariant();
+        var gateway = _paymentGateways.FirstOrDefault(g => g.Method == method)
+            ?? throw new BadRequestException($"Payment method '{method}' is not available yet.");
+
+        // VND is a whole-unit currency — pin the amount so the pending row matches what the
+        // provider confirms in the IPN (avoids spurious amount-mismatch failures).
+        var amount = Math.Truncate(request.Amount);
+        var orderId = $"DEP-{Guid.NewGuid():N}";
+        const string orderInfo = "Nap tien vao vi UNI-EDU";
+
+        // Create the Pending ledger row BEFORE calling the provider, so the IPN always has a
+        // record to settle. Balance stays untouched until the IPN confirms.
+        var transactionId = await _walletRepo.CreatePendingDepositAsync(
+            callerUserId, amount, method, orderId, orderInfo, cancellationToken);
+
+        var creation = await gateway.CreatePaymentAsync(
+            new PaymentCreationCommand(amount, orderId, orderInfo), cancellationToken);
+
+        return new DepositResponse
+        {
+            TransactionId = transactionId,
+            PayUrl = creation.PayUrl,
+            Status = "pending"
+        };
+    }
+
+    public async Task<DepositSettleOutcome> HandleMomoIpnAsync(MomoIpnCallback callback, CancellationToken cancellationToken)
+    {
+        // Signature is the ONLY trust anchor — the caller is unauthenticated.
+        if (!_momoGateway.VerifyIpnSignature(callback))
+            throw new Exceptions.UnauthorizedAccessException("Invalid Momo IPN signature.");
+
+        var success = callback.ResultCode == 0;
+
+        // Idempotent credit — trust Momo's confirmed amount, not anything client-supplied.
+        return await _walletRepo.SettleDepositAsync(
+            callback.OrderId, success, callback.TransId.ToString(), callback.Amount, cancellationToken);
     }
 
     // Student/parent call the booking debit "tuition_payment"; the ledger stores it as EscrowIn.
