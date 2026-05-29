@@ -51,6 +51,34 @@ public class WalletController(IWalletService walletService) : ControllerBase
         return StatusCode(StatusCodes.Status200OK, apiResponse);
     }
 
+    [HttpPost("deposit")]
+    [Authorize]
+    public async Task<IActionResult> Deposit([FromBody] DepositRequest request, CancellationToken cancellationToken)
+    {
+        var (userId, _) = ReadCallerOrThrow();
+
+        DepositResponse result = await _walletService.InitiateDepositAsync(request, userId, cancellationToken);
+
+        ApiResponse<DepositResponse> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Deposit initiated. Redirect the user to payUrl to complete payment.",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
+
+    // Server-to-server callback from Momo. No JWT — trust is established by signature
+    // verification inside the service. Returns 204 to acknowledge (stops provider retries).
+    [HttpPost("deposit/momo-ipn")]
+    [AllowAnonymous]
+    public async Task<IActionResult> MomoIpn([FromBody] MomoIpnCallback callback, CancellationToken cancellationToken)
+    {
+        await _walletService.HandleMomoIpnAsync(callback, cancellationToken);
+        return NoContent();
+    }
+
     private (Guid UserId, string Role) ReadCallerOrThrow()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
