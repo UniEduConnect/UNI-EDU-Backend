@@ -1,6 +1,7 @@
 using FluentValidation;
 using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Wallets;
+using UNI_EDU_Backend.Application.DTOs.Withdrawals;
 using UNI_EDU_Backend.Application.Exceptions;
 using UNI_EDU_Backend.Application.Interfaces;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
@@ -10,8 +11,10 @@ namespace UNI_EDU_Backend.Application.Services.Wallets;
 
 public class WalletService(
     IWalletRepository walletRepo,
+    IWithdrawalRepository withdrawalRepo,
     IValidator<TransactionListQuery> transactionsValidator,
     IValidator<DepositRequest> depositValidator,
+    IValidator<CreateWithdrawalRequest> withdrawalValidator,
     IEnumerable<IPaymentGateway> paymentGateways,
     IMomoGateway momoGateway,
     IVnPayGateway vnPayGateway) : IWalletService
@@ -19,8 +22,10 @@ public class WalletService(
     private const int PageSize = 10;
 
     private readonly IWalletRepository _walletRepo = walletRepo;
+    private readonly IWithdrawalRepository _withdrawalRepo = withdrawalRepo;
     private readonly IValidator<TransactionListQuery> _transactionsValidator = transactionsValidator;
     private readonly IValidator<DepositRequest> _depositValidator = depositValidator;
+    private readonly IValidator<CreateWithdrawalRequest> _withdrawalValidator = withdrawalValidator;
     private readonly IEnumerable<IPaymentGateway> _paymentGateways = paymentGateways;
     private readonly IMomoGateway _momoGateway = momoGateway;
     private readonly IVnPayGateway _vnPayGateway = vnPayGateway;
@@ -158,6 +163,16 @@ public class WalletService(
             DepositSettleOutcome.Credited       => new VnPayIpnResponse { RspCode = "00", Message = "Confirm Success" },
             _                                   => new VnPayIpnResponse { RspCode = "99", Message = "Unknown error" }
         };
+    }
+
+    public async Task<WithdrawalResponse> CreateWithdrawalAsync(CreateWithdrawalRequest request, Guid callerUserId, CancellationToken cancellationToken)
+    {
+        // Tutor-only is enforced at the controller via [Authorize(Roles = "Tutor")].
+        await _withdrawalValidator.EnsureValidAsync(request, cancellationToken);
+
+        // Balance check + debit + insert happen atomically inside the repo (single DB transaction)
+        // to prevent double-spend on concurrent requests.
+        return await _withdrawalRepo.CreateAsync(callerUserId, request, cancellationToken);
     }
 
     // Student/parent call the booking debit "tuition_payment"; the ledger stores it as EscrowIn.

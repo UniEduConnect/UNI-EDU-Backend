@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using UNI_EDU_Backend.API.Commons;
 using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Wallets;
+using UNI_EDU_Backend.Application.DTOs.Withdrawals;
 using UNI_EDU_Backend.Application.Services.Wallets;
 using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
 
@@ -77,6 +78,24 @@ public class WalletController(IWalletService walletService) : ControllerBase
     {
         await _walletService.HandleMomoIpnAsync(callback, cancellationToken);
         return NoContent();
+    }
+
+    [HttpPost("withdraw")]
+    [Authorize(Roles = "Tutor")]
+    public async Task<IActionResult> Withdraw([FromBody] CreateWithdrawalRequest request, CancellationToken cancellationToken)
+    {
+        var (userId, _) = ReadCallerOrThrow();
+
+        WithdrawalResponse result = await _walletService.CreateWithdrawalAsync(request, userId, cancellationToken);
+
+        ApiResponse<WithdrawalResponse> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status201Created,
+            Message = "Withdrawal request created. Awaiting finance approval.",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status201Created, apiResponse);
     }
 
     // VNPay sends the IPN as GET with all data in the query string (including vnp_SecureHash).
