@@ -1,5 +1,6 @@
 using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Wallets;
+using UNI_EDU_Backend.Application.DTOs.Withdrawals;
 
 namespace UNI_EDU_Backend.Application.Services.Wallets;
 
@@ -18,4 +19,8 @@ public interface IWalletService
     // Verifies + applies a VNPay IPN (idempotent). Returns the VNPay-formatted ack response —
     // never throws on bad signature so VNPay receives a structured "97 Invalid Checksum".
     Task<VnPayIpnResponse> HandleVnPayIpnAsync(IReadOnlyDictionary<string, string> vnpFields, string providedHash, CancellationToken cancellationToken);
+
+    // Tutors only: creates a Pending withdrawal request and locks the requested amount by
+    // debiting wallet.Balance. Finance approves/rejects via the (future) P3 endpoints.
+    Task<WithdrawalResponse> CreateWithdrawalAsync(CreateWithdrawalRequest request, Guid callerUserId, CancellationToken cancellationToken);
 }

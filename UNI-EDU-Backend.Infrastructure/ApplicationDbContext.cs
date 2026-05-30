@@ -28,6 +28,7 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<WalletTransaction> WalletTransactions { get; set; }
         public DbSet<Session> Sessions { get; set; }
         public DbSet<ClassMaterial> ClassMaterials { get; set; }
+        public DbSet<Withdrawal> Withdrawals { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -155,6 +156,19 @@ namespace UNI_EDU_Backend.Infrastructure
                 .WithMany(c => c.Materials)
                 .HasForeignKey(m => m.ClassID)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Withdrawal FKs: keep history if tutor deleted; null out reviewer link if their user is deleted.
+            modelBuilder.Entity<Withdrawal>()
+                .HasOne(w => w.Tutor)
+                .WithMany()
+                .HasForeignKey(w => w.TutorID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Withdrawal>()
+                .HasOne(w => w.Reviewer)
+                .WithMany()
+                .HasForeignKey(w => w.ReviewerID)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Postgres array / jsonb columns on Tutor
             modelBuilder.Entity<Tutor>()
