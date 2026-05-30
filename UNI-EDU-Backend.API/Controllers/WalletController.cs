@@ -79,6 +79,24 @@ public class WalletController(IWalletService walletService) : ControllerBase
         return NoContent();
     }
 
+    // VNPay sends the IPN as GET with all data in the query string (including vnp_SecureHash).
+    // Trust is established by signature verification inside the service; always reply 200 with
+    // VNPay's structured { RspCode, Message } so VNPay stops retrying.
+    [HttpGet("deposit/vnpay-ipn")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VnPayIpn(CancellationToken cancellationToken)
+    {
+        var providedHash = Request.Query["vnp_SecureHash"].ToString();
+        var vnpFields = Request.Query
+            .Where(kv => kv.Key.StartsWith("vnp_")
+                         && kv.Key != "vnp_SecureHash"
+                         && kv.Key != "vnp_SecureHashType")
+            .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
+
+        var response = await _walletService.HandleVnPayIpnAsync(vnpFields, providedHash, cancellationToken);
+        return Ok(response);
+    }
+
     private (Guid UserId, string Role) ReadCallerOrThrow()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value

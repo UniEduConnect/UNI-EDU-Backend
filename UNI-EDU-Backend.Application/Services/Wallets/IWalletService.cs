@@ -14,4 +14,8 @@ public interface IWalletService
 
     // Verifies + applies a Momo IPN callback (idempotent). Throws on bad signature.
     Task<DepositSettleOutcome> HandleMomoIpnAsync(MomoIpnCallback callback, CancellationToken cancellationToken);
+
+    // Verifies + applies a VNPay IPN (idempotent). Returns the VNPay-formatted ack response —
+    // never throws on bad signature so VNPay receives a structured "97 Invalid Checksum".
+    Task<VnPayIpnResponse> HandleVnPayIpnAsync(IReadOnlyDictionary<string, string> vnpFields, string providedHash, CancellationToken cancellationToken);
 }
