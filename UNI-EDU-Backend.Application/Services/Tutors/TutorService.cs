@@ -9,7 +9,8 @@ namespace UNI_EDU_Backend.Application.Services.Tutors;
 public class TutorService(
     ITutorRepository tutorRepo,
     IValidator<TutorSearchQuery> searchValidator,
-    IValidator<TutorReviewsQuery> reviewsValidator) : ITutorService
+    IValidator<TutorReviewsQuery> reviewsValidator,
+    IValidator<SaveBankAccountRequest> saveBankValidator) : ITutorService
 {
     private const int PageSize = 10;
     private const int RecentReviewCount = 10;
@@ -17,6 +18,7 @@ public class TutorService(
     private readonly ITutorRepository _tutorRepo = tutorRepo;
     private readonly IValidator<TutorSearchQuery> _searchValidator = searchValidator;
     private readonly IValidator<TutorReviewsQuery> _reviewsValidator = reviewsValidator;
+    private readonly IValidator<SaveBankAccountRequest> _saveBankValidator = saveBankValidator;
 
     public async Task<PagedResult<TutorListingResponse>> SearchTutorsAsync(TutorSearchQuery query, CancellationToken cancellationToken)
     {
@@ -57,5 +59,31 @@ public class TutorService(
             Page = query.Page,
             PageSize = PageSize
         };
+    }
+
+    public Task<BankAccountResponse?> GetMyBankAccountAsync(Guid tutorId, CancellationToken cancellationToken) =>
+        _tutorRepo.GetBankAccountAsync(tutorId, cancellationToken);
+
+    public async Task<BankAccountResponse> SaveMyBankAccountAsync(Guid tutorId, SaveBankAccountRequest request, CancellationToken cancellationToken)
+    {
+        await _saveBankValidator.EnsureValidAsync(request, cancellationToken);
+
+        var saved = await _tutorRepo.SaveBankAccountAsync(tutorId, request, cancellationToken);
+        if (!saved)
+            throw new NotFoundException($"Tutor with id '{tutorId}' not found.");
+
+        return new BankAccountResponse
+        {
+            BankName = request.BankName.Trim(),
+            BankAccount = request.BankAccount.Trim(),
+            BankAccountHolder = request.BankAccountHolder.Trim()
+        };
+    }
+
+    public async Task DeleteMyBankAccountAsync(Guid tutorId, CancellationToken cancellationToken)
+    {
+        var deleted = await _tutorRepo.DeleteBankAccountAsync(tutorId, cancellationToken);
+        if (!deleted)
+            throw new NotFoundException($"Tutor with id '{tutorId}' not found.");
     }
 }

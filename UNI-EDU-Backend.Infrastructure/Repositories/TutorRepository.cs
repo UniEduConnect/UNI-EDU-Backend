@@ -220,6 +220,57 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
     public Task<bool> ExistsAsync(Guid tutorId, CancellationToken cancellationToken) =>
         _dbContext.Tutors.AnyAsync(t => t.TutorID == tutorId, cancellationToken);
 
+    public async Task<BankAccountResponse?> GetBankAccountAsync(Guid tutorId, CancellationToken cancellationToken)
+    {
+        var row = await _dbContext.Tutors
+            .AsNoTracking()
+            .Where(t => t.TutorID == tutorId)
+            .Select(t => new { t.BankName, t.BankAccount, t.BankAccountHolder })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Either no tutor row OR all three fields empty/null → caller treats as "not saved".
+        if (row is null
+            || string.IsNullOrWhiteSpace(row.BankName)
+            || string.IsNullOrWhiteSpace(row.BankAccount)
+            || string.IsNullOrWhiteSpace(row.BankAccountHolder))
+        {
+            return null;
+        }
+
+        return new BankAccountResponse
+        {
+            BankName = row.BankName,
+            BankAccount = row.BankAccount,
+            BankAccountHolder = row.BankAccountHolder
+        };
+    }
+
+    public async Task<bool> SaveBankAccountAsync(Guid tutorId, SaveBankAccountRequest request, CancellationToken cancellationToken)
+    {
+        var tutor = await _dbContext.Tutors.FirstOrDefaultAsync(t => t.TutorID == tutorId, cancellationToken);
+        if (tutor is null) return false;
+
+        tutor.BankName = request.BankName.Trim();
+        tutor.BankAccount = request.BankAccount.Trim();
+        tutor.BankAccountHolder = request.BankAccountHolder.Trim();
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> DeleteBankAccountAsync(Guid tutorId, CancellationToken cancellationToken)
+    {
+        var tutor = await _dbContext.Tutors.FirstOrDefaultAsync(t => t.TutorID == tutorId, cancellationToken);
+        if (tutor is null) return false;
+
+        tutor.BankName = null;
+        tutor.BankAccount = null;
+        tutor.BankAccountHolder = null;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<(List<TutorReviewResponse> Items, int Total)> GetReviewsByTutorIdAsync(Guid tutorId, int page, int pageSize, CancellationToken cancellationToken)
     {
         var reviews = _dbContext.Reviews.AsNoTracking().Where(r => r.TutorID == tutorId);

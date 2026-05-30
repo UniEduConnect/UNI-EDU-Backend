@@ -32,6 +32,12 @@ namespace UNI_EDU_Backend.Domain.Models
         public List<string>? Achievements { get; set; } = new();
         public List<AvailableSlot>? AvailableSlots { get; set; } = new();
 
+        // Saved bank account for payouts (single per tutor). All three are set/cleared together:
+        // POST /tutors/me/bank-account saves; DELETE clears. Nullable for tutors who haven't saved yet.
+        public string? BankName { get; set; }
+        public string? BankAccount { get; set; }
+        public string? BankAccountHolder { get; set; }
+
         // Navigation Properties
         public virtual User User { get; set; }
         public virtual ICollection<Class> Classes { get; set; }
