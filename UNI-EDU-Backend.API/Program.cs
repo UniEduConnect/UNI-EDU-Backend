@@ -53,11 +53,17 @@ builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<IParentService, ParentService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 
-// Payment gateways (Momo). Settings bound from the "Momo" config section / Momo__* env vars.
+// Payment gateways (Momo + VNPay). Both register as IPaymentGateway so the deposit service
+// resolves the right one by Method. Settings bound from "Momo" / "VnPay" config sections.
 builder.Services.Configure<MomoOptions>(builder.Configuration.GetSection("Momo"));
 builder.Services.AddHttpClient<MomoGateway>();
 builder.Services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<MomoGateway>());
 builder.Services.AddScoped<IMomoGateway>(sp => sp.GetRequiredService<MomoGateway>());
+
+builder.Services.Configure<VnPayOptions>(builder.Configuration.GetSection("VnPay"));
+builder.Services.AddScoped<VnPayGateway>();
+builder.Services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<VnPayGateway>());
+builder.Services.AddScoped<IVnPayGateway>(sp => sp.GetRequiredService<VnPayGateway>());
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 

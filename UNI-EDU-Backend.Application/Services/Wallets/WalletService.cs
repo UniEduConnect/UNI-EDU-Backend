@@ -13,7 +13,8 @@ public class WalletService(
     IValidator<TransactionListQuery> transactionsValidator,
     IValidator<DepositRequest> depositValidator,
     IEnumerable<IPaymentGateway> paymentGateways,
-    IMomoGateway momoGateway) : IWalletService
+    IMomoGateway momoGateway,
+    IVnPayGateway vnPayGateway) : IWalletService
 {
     private const int PageSize = 10;
 
@@ -22,6 +23,7 @@ public class WalletService(
     private readonly IValidator<DepositRequest> _depositValidator = depositValidator;
     private readonly IEnumerable<IPaymentGateway> _paymentGateways = paymentGateways;
     private readonly IMomoGateway _momoGateway = momoGateway;
+    private readonly IVnPayGateway _vnPayGateway = vnPayGateway;
 
     public async Task<WalletResponse> GetMyWalletAsync(Guid callerUserId, string callerRole, CancellationToken cancellationToken)
     {
@@ -122,6 +124,40 @@ public class WalletService(
         // Idempotent credit — trust Momo's confirmed amount, not anything client-supplied.
         return await _walletRepo.SettleDepositAsync(
             callback.OrderId, success, callback.TransId.ToString(), callback.Amount, cancellationToken);
+    }
+
+    public async Task<VnPayIpnResponse> HandleVnPayIpnAsync(IReadOnlyDictionary<string, string> vnpFields, string providedHash, CancellationToken cancellationToken)
+    {
+        // Signature is the only trust anchor — fail first, before touching the DB.
+        if (!_vnPayGateway.VerifyCallbackSignature(vnpFields, providedHash))
+            return new VnPayIpnResponse { RspCode = "97", Message = "Invalid Checksum" };
+
+        if (!vnpFields.TryGetValue("vnp_TxnRef", out var orderId) ||
+            !vnpFields.TryGetValue("vnp_Amount", out var amountStr) ||
+            !vnpFields.TryGetValue("vnp_ResponseCode", out var responseCode) ||
+            !vnpFields.TryGetValue("vnp_TransactionStatus", out var transactionStatus) ||
+            !long.TryParse(amountStr, out var amountSubunits))
+        {
+            return new VnPayIpnResponse { RspCode = "99", Message = "Unknown error" };
+        }
+
+        var transactionNo = vnpFields.TryGetValue("vnp_TransactionNo", out var tn) ? tn : string.Empty;
+        var success = responseCode == "00" && transactionStatus == "00";
+        // VNPay amount is in subunits (×100). Convert back to whole VND to compare to the stored row.
+        var confirmedAmount = amountSubunits / 100m;
+
+        var outcome = await _walletRepo.SettleDepositAsync(orderId, success, transactionNo, confirmedAmount, cancellationToken);
+
+        return outcome switch
+        {
+            DepositSettleOutcome.NotFound       => new VnPayIpnResponse { RspCode = "01", Message = "Order Not Found" },
+            DepositSettleOutcome.AlreadySettled => new VnPayIpnResponse { RspCode = "02", Message = "Order already confirmed" },
+            DepositSettleOutcome.AmountMismatch => new VnPayIpnResponse { RspCode = "04", Message = "Invalid Amount" },
+            // Provider reported failure but we recorded it — ack with 00 so VNPay stops retrying.
+            DepositSettleOutcome.Failed         => new VnPayIpnResponse { RspCode = "00", Message = "Confirm Success" },
+            DepositSettleOutcome.Credited       => new VnPayIpnResponse { RspCode = "00", Message = "Confirm Success" },
+            _                                   => new VnPayIpnResponse { RspCode = "99", Message = "Unknown error" }
+        };
     }
 
     // Student/parent call the booking debit "tuition_payment"; the ledger stores it as EscrowIn.
