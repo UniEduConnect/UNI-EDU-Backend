@@ -56,6 +56,19 @@ namespace UNI_EDU_Backend.API.Controllers
         }
 
         [HttpPost]
+        [Route("api/register/parent")]
+        public async Task<IActionResult> RegisterParentAsync([FromBody] ParentRegister request)
+        {
+            var response = await _authService.RegisterParentAsync(request);
+            return Created("", new ApiResponse<object>
+            {
+                StatusCode = 201,
+                Message = "Parent registered successfully",
+                Data = response
+            });
+        }
+
+        [HttpPost]
         [Route("api/refresh-token")]
         public async Task<IActionResult> RefreshTokenAsync()
         {

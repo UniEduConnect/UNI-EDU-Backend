@@ -20,11 +20,17 @@ namespace UNI_EDU_Backend.Application.Mappings
                 .ForMember(dest => dest.Role, opt => opt.MapFrom(src => UserRole.Student))
                 .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow));
 
+            CreateMap<ParentRegister, User>()
+                .ForMember(dest => dest.HashedPassword, opt => opt.Ignore())
+                .ForMember(dest => dest.Role, opt => opt.MapFrom(src => UserRole.Parent))
+                .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow));
+
             // Mapping data riêng biệt vào các Role Entities
             CreateMap<TutorRegister, Tutor>()
                 .ForMember(dest => dest.AverageRating, opt => opt.MapFrom(src => 0));
 
             CreateMap<StudentRegister, Student>();
+            CreateMap<ParentRegister, Parent>();
         }
     }
 }
