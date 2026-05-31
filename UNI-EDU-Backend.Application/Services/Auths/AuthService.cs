@@ -19,6 +19,7 @@ namespace UNI_EDU_Backend.Application.Services.Auths
         private readonly IAuthRepository _authRepository;
         private readonly IStudentRepository _studentRepository;
         private readonly ITutorRepository _tutorRepository;
+        private readonly IParentRepository _parentRepository;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly IGenericRepository<RefreshToken> _genericRepository;
         private readonly IMapper _autoMapper;
@@ -30,6 +31,7 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             IAuthRepository authRepository,
             IStudentRepository studentRepository,
             ITutorRepository tutorRepository,
+            IParentRepository parentRepository,
             IRefreshTokenRepository refreshTokenRepository,
             IMapper autoMapper,
             IGenericRepository<RefreshToken> genericRepository,
@@ -40,6 +42,7 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             this._authRepository = authRepository;
             this._studentRepository = studentRepository;
             this._tutorRepository = tutorRepository;
+            this._parentRepository = parentRepository;
             this._refreshTokenRepository = refreshTokenRepository;
             this._genericRepository = genericRepository;
             this._autoMapper = autoMapper;
@@ -127,6 +130,8 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             parent.ParentID = userEntity.UserID;
             parent.User = userEntity;
             await _authRepository.AddAsync(userEntity);
+            await _parentRepository.AddAsync(parent);
+
             await _unitOfWork.SaveChangesAsync();
             return true;
         }
