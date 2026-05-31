@@ -113,6 +113,24 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             return true;
         }
 
+        public async Task<bool> RegisterParentAsync(ParentRegister registerDto)
+        {
+            var existedUser = await _authRepository.IsPhonenumberOrEmailTakenAsync(registerDto.PhoneNumber, registerDto.Email);
+            if (existedUser)
+            {
+                throw new Exceptions.BadRequestException("Phone number or email is already taken.");
+            }
+            var userEntity = _autoMapper.Map<User>(registerDto);
+            userEntity.UserID = Guid.NewGuid();
+            userEntity.HashedPassword = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
+            var parent = _autoMapper.Map<Parent>(registerDto);
+            parent.ParentID = userEntity.UserID;
+            parent.User = userEntity;
+            await _authRepository.AddAsync(userEntity);
+            await _unitOfWork.SaveChangesAsync();
+            return true;
+        }
+
         public async Task<TokenResponse> RefreshTokenAsync(string request)
         {
             var existToken = await _refreshTokenRepository.GetFirstOrDefaultAsync(x => x.Token == request);
