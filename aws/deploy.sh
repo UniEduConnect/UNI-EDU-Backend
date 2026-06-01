@@ -39,11 +39,20 @@ echo "==> Pushing to ECR..."
 docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
 docker push ${ECR_URI}:${IMAGE_TAG}
 
-# ── Step 4: Update ECS service (force new deployment) ──────
+# ── Step 4: Register new task definition revision ─────────
+echo "==> Registering task definition..."
+aws ecs register-task-definition \
+  --cli-input-json file://aws/task-definition.json \
+  --region ${AWS_REGION} \
+  > /dev/null
+echo "    Registered new revision of uni-edu-api"
+
+# ── Step 5: Update ECS service to the latest revision ──────
 echo "==> Updating ECS service..."
 aws ecs update-service \
   --cluster ${ECS_CLUSTER} \
   --service ${ECS_SERVICE} \
+  --task-definition uni-edu-api \
   --force-new-deployment \
   --region ${AWS_REGION}
 

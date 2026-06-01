@@ -4,11 +4,11 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
-  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/ecsTaskExecutionRole",
+  "executionRoleArn": "arn:aws:iam::164733187525:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
       "name": "uni-edu-api",
-      "image": "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/uni-edu-api:latest",
+      "image": "164733187525.dkr.ecr.ap-southeast-1.amazonaws.com/uni-edu-api:latest",
       "portMappings": [
         {
           "containerPort": 8080,
@@ -19,21 +19,22 @@
         { "name": "ASPNETCORE_ENVIRONMENT", "value": "Production" },
         { "name": "ASPNETCORE_URLS", "value": "http://+:8080" },
         { "name": "ENABLE_SWAGGER", "value": "true" },
-        { "name": "AUTO_MIGRATE", "value": "true" }
+        { "name": "AUTO_MIGRATE", "value": "true" },
+        { "name": "POSTGRES_SSLMODE", "value": "Require" }
       ],
       "secrets": [
-        { "name": "POSTGRES_DB", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/uni-edu/POSTGRES_DB" },
-        { "name": "POSTGRES_USER", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/uni-edu/POSTGRES_USER" },
-        { "name": "POSTGRES_PASSWORD", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/uni-edu/POSTGRES_PASSWORD" },
-        { "name": "POSTGRES_HOST", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/uni-edu/POSTGRES_HOST" },
-        { "name": "POSTGRES_PORT", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/uni-edu/POSTGRES_PORT" },
-        { "name": "JWT_SecretKey", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/uni-edu/JWT_SecretKey" }
+        { "name": "POSTGRES_DB", "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/POSTGRES_DB" },
+        { "name": "POSTGRES_USER", "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/POSTGRES_USER" },
+        { "name": "POSTGRES_PASSWORD", "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/POSTGRES_PASSWORD" },
+        { "name": "POSTGRES_HOST", "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/POSTGRES_HOST" },
+        { "name": "POSTGRES_PORT", "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/POSTGRES_PORT" },
+        { "name": "JWT_SecretKey", "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/JWT_SecretKey" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/uni-edu-api",
-          "awslogs-region": "<REGION>",
+          "awslogs-region": "ap-southeast-1",
           "awslogs-stream-prefix": "ecs"
         }
       },
