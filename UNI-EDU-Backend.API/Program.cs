@@ -82,7 +82,10 @@ var user = Env.GetString("POSTGRES_USER") ?? builder.Configuration["POSTGRES_USE
 var pass = Env.GetString("POSTGRES_PASSWORD") ?? builder.Configuration["POSTGRES_PASSWORD"];
 var host = Env.GetString("POSTGRES_HOST") ?? builder.Configuration["POSTGRES_HOST"] ?? "localhost";
 var port = Env.GetString("POSTGRES_PORT") ?? builder.Configuration["POSTGRES_PORT"] ?? "5432";
-var connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};";
+// RDS bắt buộc SSL; local (docker compose) không có SSL. Mặc định Disable cho local,
+// production set POSTGRES_SSLMODE=Require qua biến môi trường.
+var sslMode = Env.GetString("POSTGRES_SSLMODE") ?? builder.Configuration["POSTGRES_SSLMODE"] ?? "Disable";
+var connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};SSL Mode={sslMode};Trust Server Certificate=true;";
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 

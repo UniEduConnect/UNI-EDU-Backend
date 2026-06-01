@@ -14,6 +14,11 @@
 
 set -euo pipefail
 
+# Tắt MSYS/Git-Bash path conversion trên Windows, nếu không "/uni-edu/..."
+# sẽ bị biến thành "C:/Program Files/Git/uni-edu/..." khi truyền cho aws CLI.
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL="*"
+
 AWS_REGION="ap-southeast-1"
 ECR_REPO="uni-edu-api"
 ECS_CLUSTER="uni-edu-cluster"
