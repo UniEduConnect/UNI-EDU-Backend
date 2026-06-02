@@ -9,6 +9,7 @@ using UNI_EDU_Backend.API.Middleware;
 using UNI_EDU_Backend.Application.Mappings;
 using UNI_EDU_Backend.API.Json;
 using UNI_EDU_Backend.Application.Services.Classes;
+using UNI_EDU_Backend.Application.Services.Sessions;
 using UNI_EDU_Backend.Application.Services.Parents;
 using UNI_EDU_Backend.Application.Services.Tutors;
 using UNI_EDU_Backend.Application.Services.Users;
@@ -38,10 +39,12 @@ builder.Services
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IStudentRepository, StudentRepository>();
+builder.Services.AddScoped<IParentRepository, ParentRepository>();
 builder.Services.AddScoped<ITutorRepository, TutorRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IClassRepository, ClassRepository>();
+builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 builder.Services.AddScoped<IWalletRepository, WalletRepository>();
 builder.Services.AddScoped<IWithdrawalRepository, WithdrawalRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -52,6 +55,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ITutorService, TutorService>();
 builder.Services.AddScoped<IClassService, ClassService>();
+builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<IParentService, ParentService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 

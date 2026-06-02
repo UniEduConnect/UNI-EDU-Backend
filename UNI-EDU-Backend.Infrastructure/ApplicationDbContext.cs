@@ -192,6 +192,11 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasConversion(
                     v => JsonSerializer.Serialize(v ?? new List<ClassScheduleSlot>(), JsonbOptions),
                     v => DeserializeJsonList<ClassScheduleSlot>(v));
+
+            // Homework attachment URLs captured when a tutor ends a session (nullable text[]).
+            modelBuilder.Entity<Session>()
+                .Property(s => s.HomeworkFiles)
+                .HasColumnType("text[]");
         }
 
         // Shared options for jsonb columns. camelCase naming matches the on-disk shape
