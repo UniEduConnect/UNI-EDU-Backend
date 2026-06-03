@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UNI_EDU_Backend.Infrastructure;
@@ -12,9 +13,11 @@ using UNI_EDU_Backend.Infrastructure;
 namespace UNI_EDU_Backend.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260603100000_AddTrialBookings")]
+    partial class AddTrialBookings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -327,20 +330,8 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<bool?>("AbsenceApproved")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("AbsenceReason")
-                        .HasColumnType("text");
-
-                    b.Property<string>("AbsenceRequestedBy")
-                        .HasColumnType("text");
-
                     b.Property<Guid>("ClassID")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("Content")
-                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -348,31 +339,10 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.Property<DateTime>("EndAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("EndedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int>("Format")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Homework")
-                        .HasColumnType("text");
-
-                    b.PrimitiveCollection<List<string>>("HomeworkFiles")
-                        .HasColumnType("text[]");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("Rating")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("RatingComment")
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("StartAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
@@ -469,16 +439,10 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CurrentLevel")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Feedback")
                         .HasColumnType("text");
 
                     b.Property<string>("Goals")
@@ -490,16 +454,7 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.Property<Guid?>("ParentID")
                         .HasColumnType("uuid");
 
-                    b.Property<double?>("Rating")
-                        .HasColumnType("double precision");
-
                     b.Property<DateTime>("RequestedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ReviewNote")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("ReviewedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")

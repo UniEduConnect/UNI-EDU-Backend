@@ -11,6 +11,7 @@ using UNI_EDU_Backend.API.Json;
 using UNI_EDU_Backend.Application.Services.Classes;
 using UNI_EDU_Backend.Application.Services.Sessions;
 using UNI_EDU_Backend.Application.Services.Parents;
+using UNI_EDU_Backend.Application.Services.Trials;
 using UNI_EDU_Backend.Application.Services.Tutors;
 using UNI_EDU_Backend.Application.Services.Users;
 using UNI_EDU_Backend.Application.Services.Wallets;
@@ -49,6 +50,7 @@ builder.Services.AddScoped<IWalletRepository, WalletRepository>();
 builder.Services.AddScoped<IWithdrawalRepository, WithdrawalRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IParentRepository, ParentRepository>();
+builder.Services.AddScoped<ITrialRepository, TrialRepository>();
 
 //Services
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -58,6 +60,7 @@ builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<IParentService, ParentService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
+builder.Services.AddScoped<ITrialService, TrialService>();
 
 // Payment gateways (Momo + VNPay). Both register as IPaymentGateway so the deposit service
 // resolves the right one by Method. Settings bound from "Momo" / "VnPay" config sections.
