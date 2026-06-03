@@ -29,6 +29,7 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<Session> Sessions { get; set; }
         public DbSet<ClassMaterial> ClassMaterials { get; set; }
         public DbSet<Withdrawal> Withdrawals { get; set; }
+        public DbSet<TrialBooking> TrialBookings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -156,6 +157,32 @@ namespace UNI_EDU_Backend.Infrastructure
                 .WithMany(c => c.Materials)
                 .HasForeignKey(m => m.ClassID)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // TrialBooking FKs: Restrict on Tutor/Student/Subject (same as Class — these are user-facing
+            // aggregates), SetNull on Parent so deleting the Parent user doesn't take trial history with it.
+            modelBuilder.Entity<TrialBooking>()
+                .HasOne(t => t.Tutor)
+                .WithMany()
+                .HasForeignKey(t => t.TutorID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TrialBooking>()
+                .HasOne(t => t.Student)
+                .WithMany()
+                .HasForeignKey(t => t.StudentID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TrialBooking>()
+                .HasOne(t => t.Parent)
+                .WithMany()
+                .HasForeignKey(t => t.ParentID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TrialBooking>()
+                .HasOne(t => t.Subject)
+                .WithMany()
+                .HasForeignKey(t => t.SubjectID)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Withdrawal FKs: keep history if tutor deleted; null out reviewer link if their user is deleted.
             modelBuilder.Entity<Withdrawal>()
