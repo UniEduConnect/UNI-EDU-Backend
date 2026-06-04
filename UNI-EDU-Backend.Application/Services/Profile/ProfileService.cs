@@ -80,4 +80,7 @@ public class ProfileService(
 
     public Task<List<ScheduleItemResponse>> GetMyScheduleAsync(Guid userId, string role, CancellationToken cancellationToken) =>
         _profileRepo.GetMyScheduleAsync(userId, role, cancellationToken);
+
+    public Task<List<DTOs.Classes.SessionResponse>> GetMySessionsAsync(Guid userId, string role, DateTime? from, DateTime? to, CancellationToken cancellationToken) =>
+        _profileRepo.GetMySessionsAsync(userId, role, from, to, cancellationToken);
 }

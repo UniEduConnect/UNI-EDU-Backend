@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.DTOs.Profile;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Enums;
@@ -188,6 +189,45 @@ public class ProfileRepository(ApplicationDbContext dbContext) : IProfileReposit
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<List<SessionResponse>> GetMySessionsAsync(Guid userId, string role, DateTime? from, DateTime? to, CancellationToken cancellationToken)
+    {
+        var q = _dbContext.Sessions.AsNoTracking().AsQueryable();
+
+        q = (role ?? string.Empty).Trim() switch
+        {
+            "Tutor" => q.Where(s => s.Class.TutorID == userId),
+            "Student" => q.Where(s => s.Class.StudentID == userId),
+            "Parent" => q.Where(s => s.Class.Student.ParentID == userId),
+            _ => q
+        };
+
+        if (from is DateTime f) q = q.Where(s => s.StartAt >= f);
+        if (to is DateTime t) q = q.Where(s => s.StartAt <= t);
+
+        var rows = await q.OrderBy(s => s.StartAt).ToListAsync(cancellationToken);
+
+        return rows.Select(s => new SessionResponse
+        {
+            Id = s.SessionID,
+            ClassId = s.ClassID,
+            StartAt = s.StartAt,
+            EndAt = s.EndAt,
+            Status = s.Status.ToString().ToLowerInvariant(),
+            Format = s.Format.ToString().ToLowerInvariant(),
+            StartedAt = s.StartedAt,
+            EndedAt = s.EndedAt,
+            Content = s.Content,
+            Notes = s.Notes,
+            Homework = s.Homework,
+            HomeworkFiles = s.HomeworkFiles ?? new(),
+            Rating = s.Rating,
+            RatingComment = s.RatingComment,
+            AbsenceReason = s.AbsenceReason,
+            AbsenceRequestedBy = s.AbsenceRequestedBy,
+            AbsenceApproved = s.AbsenceApproved
+        }).ToList();
     }
 
     public async Task<List<ScheduleItemResponse>> GetMyScheduleAsync(Guid userId, string role, CancellationToken cancellationToken)

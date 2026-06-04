@@ -85,4 +85,61 @@ public class MessageRepository(ApplicationDbContext dbContext) : IMessageReposit
 
         return unread.Count;
     }
+
+    public async Task<List<ConversationResponse>> GetMyConversationsAsync(Guid userId, string role, CancellationToken cancellationToken)
+    {
+        var trimmed = (role ?? string.Empty).Trim();
+
+        var classesQuery = _dbContext.Classes.AsNoTracking().AsQueryable();
+        classesQuery = trimmed switch
+        {
+            "Tutor" => classesQuery.Where(c => c.TutorID == userId),
+            "Student" => classesQuery.Where(c => c.StudentID == userId),
+            "Parent" => classesQuery.Where(c => c.Student.ParentID == userId),
+            _ => classesQuery // Admin: all
+        };
+
+        var classes = await classesQuery
+            .Select(c => new
+            {
+                c.ClassID,
+                c.Name,
+                TutorName = c.Tutor.FullName ?? c.Tutor.User.Fullname,
+                TutorAvatar = c.Tutor.AvatarUrl,
+                StudentName = c.Student.FullName ?? c.Student.User.Fullname
+            })
+            .ToListAsync(cancellationToken);
+
+        var classIds = classes.Select(c => c.ClassID).ToList();
+
+        var messages = await _dbContext.Messages.AsNoTracking()
+            .Where(m => classIds.Contains(m.ClassID))
+            .Select(m => new { m.ClassID, m.SenderID, m.Content, m.CreatedAt, m.IsRead })
+            .ToListAsync(cancellationToken);
+
+        var byClass = messages.GroupBy(m => m.ClassID).ToDictionary(g => g.Key, g => g.ToList());
+
+        var result = new List<ConversationResponse>();
+        foreach (var c in classes)
+        {
+            byClass.TryGetValue(c.ClassID, out var msgs);
+            if (msgs is null || msgs.Count == 0) continue; // sidebar shows threads with messages
+
+            var last = msgs.OrderByDescending(m => m.CreatedAt).First();
+            var isTutor = trimmed == "Tutor";
+
+            result.Add(new ConversationResponse
+            {
+                ClassId = c.ClassID,
+                ClassName = c.Name ?? string.Empty,
+                OtherPartyName = isTutor ? (c.StudentName ?? string.Empty) : (c.TutorName ?? string.Empty),
+                OtherPartyAvatar = isTutor ? null : c.TutorAvatar,
+                LastMessage = last.Content,
+                LastTimestamp = last.CreatedAt,
+                UnreadCount = msgs.Count(m => m.SenderID != userId && !m.IsRead)
+            });
+        }
+
+        return result.OrderByDescending(r => r.LastTimestamp).ToList();
+    }
 }

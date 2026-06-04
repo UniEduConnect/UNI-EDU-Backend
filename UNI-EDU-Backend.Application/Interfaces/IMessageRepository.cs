@@ -12,4 +12,7 @@ public interface IMessageRepository
 
     // Marks messages in the thread NOT sent by the reader as read. Returns the count updated.
     Task<int> MarkReadAsync(Guid classId, Guid readerId, CancellationToken cancellationToken);
+
+    // Sidebar roll-up: one row per class the caller participates in that has messages.
+    Task<List<ConversationResponse>> GetMyConversationsAsync(Guid userId, string role, CancellationToken cancellationToken);
 }

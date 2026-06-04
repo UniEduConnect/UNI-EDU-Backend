@@ -36,6 +36,9 @@ public class ChatService(
         return await _messageRepo.MarkReadAsync(classId, callerUserId, cancellationToken);
     }
 
+    public Task<List<ConversationResponse>> GetMyConversationsAsync(Guid callerUserId, string callerRole, CancellationToken cancellationToken) =>
+        _messageRepo.GetMyConversationsAsync(callerUserId, callerRole, cancellationToken);
+
     private async Task EnsureParticipantAsync(Guid classId, Guid callerUserId, string callerRole, bool allowAdmin, CancellationToken cancellationToken)
     {
         var access = await _messageRepo.GetClassAccessAsync(classId, cancellationToken)

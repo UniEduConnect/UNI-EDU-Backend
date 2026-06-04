@@ -1,9 +1,13 @@
+using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.DTOs.Profile;
 
 namespace UNI_EDU_Backend.Application.Interfaces.Repositories;
 
 public interface IProfileRepository
 {
+    // All of the caller's sessions across their classes, optionally filtered by date window.
+    Task<List<SessionResponse>> GetMySessionsAsync(Guid userId, string role, DateTime? from, DateTime? to, CancellationToken cancellationToken);
+
     Task<CurrentUserResponse?> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken);
 
     // Updates supplied (non-null) common User fields. False if the user doesn't exist.
