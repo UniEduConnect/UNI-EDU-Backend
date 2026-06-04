@@ -102,6 +102,8 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             var userEntity = _autoMapper.Map<User>(registerDto);
             userEntity.UserID = Guid.NewGuid();
             userEntity.HashedPassword = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
+            // New tutors await admin approval (login is NOT gated — see User.Status).
+            userEntity.Status = Domain.Enums.UserStatus.Pending;
 
             var tutor = _autoMapper.Map<Tutor>(registerDto);
             tutor.TutorID = userEntity.UserID;

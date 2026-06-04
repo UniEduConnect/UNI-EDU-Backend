@@ -19,7 +19,12 @@ namespace UNI_EDU_Backend.Domain.Models
         public string Answers { get; set; }
 
         public float Score { get; set; }
-        public string AIFeedback { get; set; }
+
+        // Auto-grading summary captured at submit time so attempt history needs no re-grading.
+        public int CorrectCount { get; set; }
+        public int TotalQuestions { get; set; }
+
+        public string? AIFeedback { get; set; }
 
         // Navigation Properties
         public virtual Exam Exam { get; set; }

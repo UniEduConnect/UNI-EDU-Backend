@@ -15,8 +15,11 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
         var db = Env.GetString("POSTGRES_DB");
         var user = Env.GetString("POSTGRES_USER");
         var pass = Env.GetString("POSTGRES_PASSWORD");
+        // RDS requires SSL; local docker-compose does not. Mirror Program.cs: default Disable,
+        // set POSTGRES_SSLMODE=Require for managed/remote databases.
+        var sslMode = Env.GetString("POSTGRES_SSLMODE") ?? "Disable";
 
-        var connectionString = $"Host={host};Port={port};Username={user};Password={pass};Database={db};";
+        var connectionString = $"Host={host};Port={port};Username={user};Password={pass};Database={db};SSL Mode={sslMode};Trust Server Certificate=true;";
 
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
         optionsBuilder.UseNpgsql(connectionString);

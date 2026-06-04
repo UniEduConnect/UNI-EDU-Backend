@@ -29,6 +29,12 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<Session> Sessions { get; set; }
         public DbSet<ClassMaterial> ClassMaterials { get; set; }
         public DbSet<Withdrawal> Withdrawals { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<Message> Messages { get; set; }
+        public DbSet<Incident> Incidents { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+        public DbSet<TrialRequest> TrialRequests { get; set; }
+        public DbSet<SystemSetting> SystemSettings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -168,6 +174,71 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasOne(w => w.Reviewer)
                 .WithMany()
                 .HasForeignKey(w => w.ReviewerID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // AuditLog keeps history even if the acting admin is deleted (null out the link).
+            modelBuilder.Entity<AuditLog>()
+                .HasOne(a => a.Actor)
+                .WithMany()
+                .HasForeignKey(a => a.ActorUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Message: cascade with its class; restrict on sender to avoid multiple cascade paths.
+            modelBuilder.Entity<Message>()
+                .HasOne(m => m.Class)
+                .WithMany()
+                .HasForeignKey(m => m.ClassID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Message>()
+                .HasOne(m => m.Sender)
+                .WithMany()
+                .HasForeignKey(m => m.SenderID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Incident: cascade with its class; null out the optional session/reporter links on delete.
+            modelBuilder.Entity<Incident>()
+                .HasOne(i => i.Class)
+                .WithMany()
+                .HasForeignKey(i => i.ClassID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Incident>()
+                .HasOne(i => i.Session)
+                .WithMany()
+                .HasForeignKey(i => i.SessionID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Incident>()
+                .HasOne(i => i.Reporter)
+                .WithMany()
+                .HasForeignKey(i => i.ReporterUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Notification: cascade with its recipient user.
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.User)
+                .WithMany()
+                .HasForeignKey(n => n.UserID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // TrialRequest: restrict on student/tutor (avoid multiple cascade paths), null out subject.
+            modelBuilder.Entity<TrialRequest>()
+                .HasOne(t => t.Student)
+                .WithMany()
+                .HasForeignKey(t => t.StudentID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TrialRequest>()
+                .HasOne(t => t.Tutor)
+                .WithMany()
+                .HasForeignKey(t => t.TutorID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TrialRequest>()
+                .HasOne(t => t.Subject)
+                .WithMany()
+                .HasForeignKey(t => t.SubjectID)
                 .OnDelete(DeleteBehavior.SetNull);
 
             // Postgres array / jsonb columns on Tutor

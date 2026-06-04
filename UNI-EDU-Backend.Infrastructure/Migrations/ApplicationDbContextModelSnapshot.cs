@@ -23,6 +23,37 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.AuditLog", b =>
+                {
+                    b.Property<Guid>("AuditLogID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("AuditLogID");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Class", b =>
                 {
                     b.Property<Guid>("ClassID")
@@ -132,6 +163,12 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ExamID"));
 
+                    b.Property<bool>("AiProctoring")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("CreatedBy")
                         .HasColumnType("integer");
 
@@ -142,7 +179,28 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("Difficulty")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Duration")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Fee")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("MaxAttemptsPerUser")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ScoreScale")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("SubjectID")
@@ -153,6 +211,9 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Year")
                         .HasColumnType("integer");
 
                     b.HasKey("ExamID");
@@ -180,6 +241,131 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.HasIndex("QuestionID");
 
                     b.ToTable("ExamQuestions");
+                });
+
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Incident", b =>
+                {
+                    b.Property<Guid>("IncidentID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClassID")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReporterName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReporterRole")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("ReporterUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Resolution")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SessionID")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("IncidentID");
+
+                    b.HasIndex("ClassID");
+
+                    b.HasIndex("ReporterUserId");
+
+                    b.HasIndex("SessionID");
+
+                    b.ToTable("Incidents");
+                });
+
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Message", b =>
+                {
+                    b.Property<Guid>("MessageID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClassID")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("SenderID")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SenderRole")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("MessageID");
+
+                    b.HasIndex("ClassID");
+
+                    b.HasIndex("SenderID");
+
+                    b.ToTable("Messages");
+                });
+
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Notification", b =>
+                {
+                    b.Property<Guid>("NotificationID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Link")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserID")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("NotificationID");
+
+                    b.HasIndex("UserID");
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Parent", b =>
@@ -234,8 +420,14 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Standard")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("SubjectID")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Topic")
+                        .HasColumnType("text");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");
@@ -363,6 +555,9 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("text");
 
+                    b.Property<bool>("OfficeConfirmed")
+                        .HasColumnType("boolean");
+
                     b.Property<int?>("Rating")
                         .HasColumnType("integer");
 
@@ -435,12 +630,14 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("SubmissionID"));
 
                     b.Property<string>("AIFeedback")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Answers")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int>("CorrectCount")
+                        .HasColumnType("integer");
 
                     b.Property<int>("ExamID")
                         .HasColumnType("integer");
@@ -450,6 +647,9 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
 
                     b.Property<DateTime>("SubmissionDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TotalQuestions")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("UserID")
                         .HasColumnType("uuid");
@@ -461,6 +661,106 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.HasIndex("UserID");
 
                     b.ToTable("Submissions");
+                });
+
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.SystemSetting", b =>
+                {
+                    b.Property<Guid>("SettingID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("EmailNotifications")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("EnableChat")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("EnableExams")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("EnablePayments")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("EscrowHoldDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EscrowPercent")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("MaintenanceMode")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MaxLoginAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PlatformName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("PushNotifications")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SessionTimeout")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("SmsNotifications")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("TwoFactorAuth")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("SettingID");
+
+                    b.ToTable("SystemSettings");
+                });
+
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.TrialRequest", b =>
+                {
+                    b.Property<Guid>("TrialRequestID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Day")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Message")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StudentID")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SubjectID")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Time")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TutorID")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("TrialRequestID");
+
+                    b.HasIndex("StudentID");
+
+                    b.HasIndex("SubjectID");
+
+                    b.HasIndex("TutorID");
+
+                    b.ToTable("TrialRequests");
                 });
 
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Tutor", b =>
@@ -585,6 +885,9 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.Property<int>("Role")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
                     b.HasKey("UserID");
 
                     b.ToTable("Users");
@@ -704,6 +1007,16 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.ToTable("Withdrawals");
                 });
 
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.AuditLog", b =>
+                {
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.User", "Actor")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Actor");
+                });
+
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Class", b =>
                 {
                     b.HasOne("UNI_EDU_Backend.Domain.Models.Student", "Student")
@@ -776,6 +1089,61 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.Navigation("Exam");
 
                     b.Navigation("Question");
+                });
+
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Incident", b =>
+                {
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.Class", "Class")
+                        .WithMany()
+                        .HasForeignKey("ClassID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.User", "Reporter")
+                        .WithMany()
+                        .HasForeignKey("ReporterUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.Session", "Session")
+                        .WithMany()
+                        .HasForeignKey("SessionID")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Class");
+
+                    b.Navigation("Reporter");
+
+                    b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Message", b =>
+                {
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.Class", "Class")
+                        .WithMany()
+                        .HasForeignKey("ClassID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.User", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Class");
+
+                    b.Navigation("Sender");
+                });
+
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Notification", b =>
+                {
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Parent", b =>
@@ -883,6 +1251,32 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     b.Navigation("Exam");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.TrialRequest", b =>
+                {
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.Subject", "Subject")
+                        .WithMany()
+                        .HasForeignKey("SubjectID")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("UNI_EDU_Backend.Domain.Models.Tutor", "Tutor")
+                        .WithMany()
+                        .HasForeignKey("TutorID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Student");
+
+                    b.Navigation("Subject");
+
+                    b.Navigation("Tutor");
                 });
 
             modelBuilder.Entity("UNI_EDU_Backend.Domain.Models.Tutor", b =>

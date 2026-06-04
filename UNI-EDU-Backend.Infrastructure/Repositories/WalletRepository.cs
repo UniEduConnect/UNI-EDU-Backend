@@ -133,4 +133,94 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
         await dbTx.CommitAsync(cancellationToken);
         return DepositSettleOutcome.Credited;
     }
+
+    public async Task<(List<AdminTransactionResponse> Items, int Total)> GetAllTransactionsAsync(string? type, string? status, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var q = _dbContext.WalletTransactions.AsNoTracking().AsQueryable();
+
+        var typeFilter = ParseType(type);
+        if (typeFilter is not null)
+            q = q.Where(x => x.Type == typeFilter);
+
+        var statusFilter = ParseStatus(status);
+        if (statusFilter is not null)
+            q = q.Where(x => x.Status == statusFilter);
+
+        var total = await q.CountAsync(cancellationToken);
+
+        var rows = await q
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new
+            {
+                x.TransactionID,
+                x.UserID,
+                UserName = x.Wallet.User.Fullname,
+                UserRole = x.Wallet.User.Role,
+                TutorType = x.Wallet.User.Tutor != null ? (TutorType?)x.Wallet.User.Tutor.TutorType : null,
+                x.Type,
+                x.Amount,
+                x.Status,
+                x.Description,
+                x.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        var items = rows.Select(x => new AdminTransactionResponse
+        {
+            Id = x.TransactionID,
+            UserId = x.UserID,
+            User = x.UserName ?? string.Empty,
+            UserRole = RoleToWire(x.UserRole, x.TutorType),
+            Type = TypeToWire(x.Type),
+            Amount = x.Amount,
+            Status = x.Status.ToString().ToLowerInvariant(),
+            Description = x.Description,
+            Date = x.CreatedAt
+        }).ToList();
+
+        return (items, total);
+    }
+
+    private static WalletTxType? ParseType(string? value) =>
+        (value ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "deposit" => WalletTxType.Deposit,
+            "escrow_in" or "tuition_payment" => WalletTxType.EscrowIn,
+            "escrow_release" => WalletTxType.EscrowRelease,
+            "withdrawal" => WalletTxType.Withdrawal,
+            "refund" => WalletTxType.Refund,
+            "platform_fee" => WalletTxType.PlatformFee,
+            _ => null
+        };
+
+    private static WalletTxStatus? ParseStatus(string? value) =>
+        (value ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "pending" => WalletTxStatus.Pending,
+            "completed" => WalletTxStatus.Completed,
+            "failed" => WalletTxStatus.Failed,
+            _ => null
+        };
+
+    private static string TypeToWire(WalletTxType type) => type switch
+    {
+        WalletTxType.Deposit => "deposit",
+        WalletTxType.EscrowIn => "escrow_in",
+        WalletTxType.EscrowRelease => "escrow_release",
+        WalletTxType.Withdrawal => "withdrawal",
+        WalletTxType.Refund => "refund",
+        WalletTxType.PlatformFee => "platform_fee",
+        _ => type.ToString().ToLowerInvariant()
+    };
+
+    private static string RoleToWire(UserRole role, TutorType? tutorType) => role switch
+    {
+        UserRole.Admin => "admin",
+        UserRole.Parent => "parent",
+        UserRole.Student => "student",
+        UserRole.Tutor => tutorType == TutorType.Teacher ? "teacher" : "tutor",
+        _ => role.ToString().ToLowerInvariant()
+    };
 }

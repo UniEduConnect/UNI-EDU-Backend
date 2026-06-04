@@ -26,5 +26,10 @@ namespace UNI_EDU_Backend.Application.Interfaces.Repositories
         // all inside one DB transaction. Safe to call repeatedly (webhook retries).
         Task<DepositSettleOutcome> SettleDepositAsync(
             string orderId, bool success, string providerTxnId, decimal confirmedAmount, CancellationToken cancellationToken);
+
+        // System-wide ledger for the finance portal, newest first. Optional type/status filters
+        // are passed as wire strings (e.g. "withdrawal", "completed").
+        Task<(List<AdminTransactionResponse> Items, int Total)> GetAllTransactionsAsync(
+            string? type, string? status, int page, int pageSize, CancellationToken cancellationToken);
     }
 }

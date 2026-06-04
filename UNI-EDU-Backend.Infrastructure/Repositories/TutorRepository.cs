@@ -301,4 +301,26 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
 
         return (items, total);
     }
+
+    public async Task<List<AvailableSlotDto>?> GetAvailabilityAsync(Guid tutorId, CancellationToken cancellationToken)
+    {
+        var row = await _dbContext.Tutors
+            .AsNoTracking()
+            .Where(t => t.TutorID == tutorId)
+            .Select(t => new { t.AvailableSlots })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return row is null ? null : MapSlots(row.AvailableSlots);
+    }
+
+    public async Task<bool> SaveAvailabilityAsync(Guid tutorId, List<AvailableSlot> slots, CancellationToken cancellationToken)
+    {
+        var tutor = await _dbContext.Tutors.FirstOrDefaultAsync(t => t.TutorID == tutorId, cancellationToken);
+        if (tutor is null) return false;
+
+        tutor.AvailableSlots = slots;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }
