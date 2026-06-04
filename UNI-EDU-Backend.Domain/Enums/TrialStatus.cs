@@ -4,6 +4,7 @@ namespace UNI_EDU_Backend.Domain.Enums
     {
         Pending = 0,
         Accepted = 1,
-        Declined = 2
+        Rejected = 2,
+        Completed = 3
     }
 }

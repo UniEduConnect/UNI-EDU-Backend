@@ -4,96 +4,169 @@ using UNI_EDU_Backend.Application.DTOs.Trials;
 using UNI_EDU_Backend.Application.Exceptions;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Enums;
+using UNI_EDU_Backend.Domain.Models;
 
 namespace UNI_EDU_Backend.Application.Services.Trials;
 
 public class TrialService(
     ITrialRepository trialRepo,
-    INotificationRepository notificationRepo,
-    IValidator<CreateTrialRequest> createValidator) : ITrialService
+    ITutorRepository tutorRepo,
+    IClassRepository classRepo,
+    IValidator<CreateTrialRequest> createValidator,
+    IValidator<TrialListQuery> listValidator,
+    IValidator<RejectTrialRequest> rejectValidator,
+    IValidator<CompleteTrialRequest> completeValidator) : ITrialService
 {
     private const int PageSize = 10;
 
     private readonly ITrialRepository _trialRepo = trialRepo;
-    private readonly INotificationRepository _notificationRepo = notificationRepo;
+    private readonly ITutorRepository _tutorRepo = tutorRepo;
+    private readonly IClassRepository _classRepo = classRepo;
     private readonly IValidator<CreateTrialRequest> _createValidator = createValidator;
+    private readonly IValidator<TrialListQuery> _listValidator = listValidator;
+    private readonly IValidator<RejectTrialRequest> _rejectValidator = rejectValidator;
+    private readonly IValidator<CompleteTrialRequest> _completeValidator = completeValidator;
 
-    public async Task<TrialResponse> CreateAsync(Guid tutorId, CreateTrialRequest request, Guid studentId, CancellationToken cancellationToken)
+    public async Task<TrialResponse> CreateAsync(Guid callerUserId, string callerRole, CreateTrialRequest request, CancellationToken cancellationToken)
     {
-        await _createValidator.EnsureValidAsync(request, cancellationToken);
+        var role = (callerRole ?? string.Empty).Trim();
 
-        if (!await _trialRepo.TutorExistsAsync(tutorId, cancellationToken))
-            throw new NotFoundException($"Tutor with id '{tutorId}' not found.");
+        // Resolve the booking student + parent link from caller identity.
+        // - Student: ignore body.StudentId, always trial-for-self, no ParentID.
+        // - Parent : body.StudentId required; must be one of caller's children; stamp ParentID.
+        // - else   : 403.
+        Guid? parentId = null;
 
-        if (request.SubjectId is Guid subjectId && !await _trialRepo.SubjectExistsAsync(subjectId, cancellationToken))
-            throw new BadRequestException($"Subject with id '{subjectId}' does not exist.");
-
-        var trial = await _trialRepo.CreateAsync(studentId, tutorId, request, cancellationToken);
-
-        // Notify the tutor of the incoming request.
-        await _notificationRepo.CreateAsync(
-            tutorId,
-            "Yêu cầu học thử mới",
-            $"{trial.StudentName} muốn học thử vào {trial.Day} {trial.Time}.",
-            "info", "/tutor/students", cancellationToken);
-
-        return trial;
-    }
-
-    public async Task<PagedResult<TrialResponse>> GetMineAsync(TrialListQuery query, Guid studentId, CancellationToken cancellationToken)
-    {
-        var page = query.Page < 1 ? 1 : query.Page;
-        var (items, total) = await _trialRepo.GetByStudentAsync(studentId, ParseStatus(query.Status), page, PageSize, cancellationToken);
-        return Page(items, total, page);
-    }
-
-    public async Task<PagedResult<TrialResponse>> GetIncomingAsync(TrialListQuery query, Guid tutorId, CancellationToken cancellationToken)
-    {
-        var page = query.Page < 1 ? 1 : query.Page;
-        var (items, total) = await _trialRepo.GetByTutorAsync(tutorId, ParseStatus(query.Status), page, PageSize, cancellationToken);
-        return Page(items, total, page);
-    }
-
-    public async Task<TrialResponse> RespondAsync(Guid trialId, Guid tutorId, bool accept, CancellationToken cancellationToken)
-    {
-        var (outcome, trial) = await _trialRepo.RespondAsync(trialId, tutorId, accept, cancellationToken);
-
-        switch (outcome)
+        switch (role)
         {
-            case TrialReviewOutcome.NotFound:
-                throw new NotFoundException($"Trial request with id '{trialId}' not found.");
-            case TrialReviewOutcome.Forbidden:
-                throw new ForbiddenAccessException("You can only respond to trial requests addressed to you.");
-            case TrialReviewOutcome.AlreadyResponded:
-                throw new BadRequestException("This trial request has already been responded to.");
+            case "Student":
+                request.StudentId = callerUserId;
+                break;
+
+            case "Parent":
+                if (request.StudentId is null || request.StudentId == Guid.Empty)
+                    throw new BadRequestException("StudentId is required when a Parent requests a trial.");
+                if (!await _classRepo.IsParentOfStudentAsync(callerUserId, request.StudentId.Value, cancellationToken))
+                    throw new ForbiddenAccessException("You can only request trials for your own children.");
+                parentId = callerUserId;
+                break;
+
+            default:
+                throw new ForbiddenAccessException("Only Student or Parent can request a trial.");
         }
 
-        // Notify the student of the tutor's decision.
-        await _notificationRepo.CreateAsync(
-            trial!.StudentId,
-            accept ? "Yêu cầu học thử được chấp nhận" : "Yêu cầu học thử bị từ chối",
-            accept
-                ? $"{trial.TutorName} đã chấp nhận buổi học thử {trial.Day} {trial.Time}."
-                : $"{trial.TutorName} đã từ chối yêu cầu học thử của bạn.",
-            accept ? "success" : "warning", "/student/classes", cancellationToken);
+        await _createValidator.EnsureValidAsync(request, cancellationToken);
 
-        return trial;
+        if (!await _tutorRepo.ExistsAsync(request.TutorId, cancellationToken))
+            throw new NotFoundException($"Tutor with id '{request.TutorId}' not found.");
+
+        if (!await _classRepo.StudentExistsAsync(request.StudentId!.Value, cancellationToken))
+            throw new NotFoundException($"Student with id '{request.StudentId}' not found.");
+
+        var subjectName = await _classRepo.GetSubjectNameAsync(request.SubjectId, cancellationToken);
+        if (subjectName is null)
+            throw new NotFoundException($"Subject with id '{request.SubjectId}' not found.");
+
+        var booking = new TrialBooking
+        {
+            TrialID = Guid.NewGuid(),
+            TutorID = request.TutorId,
+            StudentID = request.StudentId!.Value,
+            ParentID = parentId,
+            SubjectID = request.SubjectId,
+            RequestedAt = DateTime.SpecifyKind(request.RequestedAt, DateTimeKind.Utc),
+            Goals = NullIfBlank(request.Goals),
+            CurrentLevel = NullIfBlank(request.CurrentLevel),
+            Note = NullIfBlank(request.Note),
+            Status = TrialStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        return await _trialRepo.CreateAsync(booking, cancellationToken);
     }
 
-    private static PagedResult<TrialResponse> Page(List<TrialResponse> items, int total, int page) => new()
+    public async Task<PagedResult<TrialResponse>> GetMyTrialsAsync(TrialListQuery query, Guid callerUserId, string callerRole, CancellationToken cancellationToken)
     {
-        Items = items,
-        Total = total,
-        Page = page,
-        PageSize = PageSize
-    };
+        await _listValidator.EnsureValidAsync(query, cancellationToken);
 
-    private static TrialStatus? ParseStatus(string? value) =>
-        (value ?? string.Empty).Trim().ToLowerInvariant() switch
+        var role = (callerRole ?? string.Empty).Trim();
+        if (role is not ("Tutor" or "Student" or "Parent" or "Admin"))
+            throw new ForbiddenAccessException("Your role cannot list trials.");
+
+        var status = ParseStatus(query.Status);
+
+        var (items, total) = await _trialRepo.GetMyTrialsAsync(callerUserId, role, status, query.Page, PageSize, cancellationToken);
+
+        return new PagedResult<TrialResponse>
         {
-            "pending" => TrialStatus.Pending,
-            "accepted" => TrialStatus.Accepted,
-            "declined" => TrialStatus.Declined,
-            _ => null
+            Items = items,
+            Total = total,
+            Page = query.Page,
+            PageSize = PageSize
         };
+    }
+
+    public Task<TrialResponse> AcceptAsync(Guid trialId, Guid callerTutorId, CancellationToken cancellationToken) =>
+        TransitionAsync(trialId, callerTutorId, TrialStatus.Accepted, reviewNote: null, cancellationToken);
+
+    public async Task<TrialResponse> RejectAsync(Guid trialId, Guid callerTutorId, RejectTrialRequest request, CancellationToken cancellationToken)
+    {
+        await _rejectValidator.EnsureValidAsync(request, cancellationToken);
+        return await TransitionAsync(trialId, callerTutorId, TrialStatus.Rejected, NullIfBlank(request.ReviewNote), cancellationToken);
+    }
+
+    private async Task<TrialResponse> TransitionAsync(Guid trialId, Guid callerTutorId, TrialStatus newStatus, string? reviewNote, CancellationToken cancellationToken)
+    {
+        var trial = await _trialRepo.GetByIdAsync(trialId, cancellationToken)
+            ?? throw new NotFoundException($"Trial with id '{trialId}' not found.");
+
+        if (trial.TutorID != callerTutorId)
+            throw new ForbiddenAccessException("You can only respond to your own trial requests.");
+
+        if (trial.Status != TrialStatus.Pending)
+            throw new BadRequestException($"Trial is no longer pending (current status: {trial.Status}).");
+
+        return await _trialRepo.ApplyTransitionAsync(trial, newStatus, reviewNote, cancellationToken);
+    }
+
+    public async Task<TrialResponse> CompleteAsync(Guid trialId, Guid callerUserId, string callerRole, CompleteTrialRequest request, CancellationToken cancellationToken)
+    {
+        await _completeValidator.EnsureValidAsync(request, cancellationToken);
+
+        var role = (callerRole ?? string.Empty).Trim();
+        if (role is not ("Student" or "Parent"))
+            throw new ForbiddenAccessException("Only Student or Parent can complete a trial.");
+
+        var trial = await _trialRepo.GetByIdAsync(trialId, cancellationToken)
+            ?? throw new NotFoundException($"Trial with id '{trialId}' not found.");
+
+        // Ownership: Student must be the booking student; Parent must be the booking
+        // student's parent (covers both parent-initiated and child-initiated trials).
+        var allowed = role switch
+        {
+            "Student" => trial.StudentID == callerUserId,
+            "Parent" => await _classRepo.IsParentOfStudentAsync(callerUserId, trial.StudentID, cancellationToken),
+            _ => false
+        };
+
+        if (!allowed)
+            throw new ForbiddenAccessException("You can only complete trials for yourself or your children.");
+
+        if (trial.Status != TrialStatus.Accepted)
+            throw new BadRequestException($"Trial cannot be completed (current status: {trial.Status}).");
+
+        return await _trialRepo.ApplyCompletionAsync(trial, NullIfBlank(request.Feedback), request.Rating, cancellationToken);
+    }
+
+    private static string? NullIfBlank(string? raw) =>
+        string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+
+    // Validator already guarantees the value is in the allowed set (or empty); parse defensively.
+    private static TrialStatus? ParseStatus(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        return Enum.TryParse<TrialStatus>(raw.Trim(), ignoreCase: true, out var parsed)
+            ? parsed
+            : throw new BadRequestException($"Invalid status '{raw}'.");
+    }
 }

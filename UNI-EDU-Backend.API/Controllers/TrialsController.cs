@@ -9,79 +9,117 @@ using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.Unaut
 
 namespace UNI_EDU_Backend.API.Controllers;
 
+[Route("api/[controller]")]
 [ApiController]
 public class TrialsController(ITrialService trialService) : ControllerBase
 {
     private readonly ITrialService _trialService = trialService;
 
-    // Student requests a trial lesson with a tutor.
-    [HttpPost("/api/tutors/{tutorId:guid}/trial-requests")]
-    [Authorize(Roles = "Student")]
-    public async Task<IActionResult> Create(Guid tutorId, [FromBody] CreateTrialRequest request, CancellationToken cancellationToken)
+    [HttpPost]
+    [Authorize(Roles = "Student,Parent")]
+    public async Task<IActionResult> Create([FromBody] CreateTrialRequest request, CancellationToken cancellationToken)
     {
-        var studentId = ReadCallerIdOrThrow();
-        TrialResponse result = await _trialService.CreateAsync(tutorId, request, studentId, cancellationToken);
+        var (userId, role) = ReadCallerOrThrow();
 
-        return StatusCode(StatusCodes.Status201Created, new ApiResponse<TrialResponse>
+        TrialResponse result = await _trialService.CreateAsync(userId, role, request, cancellationToken);
+
+        ApiResponse<TrialResponse> apiResponse = new()
         {
             StatusCode = StatusCodes.Status201Created,
-            Message = "Trial request created successfully",
+            Message = "Trial booking request created successfully",
             Data = result
-        });
+        };
+
+        return StatusCode(StatusCodes.Status201Created, apiResponse);
     }
 
-    // The caller's own trial requests (student view).
-    [HttpGet("/api/trials/me")]
-    [Authorize(Roles = "Student")]
-    public async Task<IActionResult> GetMine([FromQuery] TrialListQuery query, CancellationToken cancellationToken)
+    // Role-scoped:
+    //   Tutor   -> inbox (trials addressed to this tutor)
+    //   Student -> outbox (trials this student initiated)
+    //   Parent  -> trials across all their children
+    //   Admin   -> every trial
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetMyTrials([FromQuery] TrialListQuery query, CancellationToken cancellationToken)
     {
-        var studentId = ReadCallerIdOrThrow();
-        PagedResult<TrialResponse> result = await _trialService.GetMineAsync(query, studentId, cancellationToken);
-        return Ok200(result);
+        var (userId, role) = ReadCallerOrThrow();
+
+        PagedResult<TrialResponse> result = await _trialService.GetMyTrialsAsync(query, userId, role, cancellationToken);
+
+        ApiResponse<PagedResult<TrialResponse>> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get trials successfully",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
     }
 
-    // Trial requests addressed to the caller (tutor view).
-    [HttpGet("/api/trials/incoming")]
-    [Authorize(Roles = "Tutor")]
-    public async Task<IActionResult> GetIncoming([FromQuery] TrialListQuery query, CancellationToken cancellationToken)
-    {
-        var tutorId = ReadCallerIdOrThrow();
-        PagedResult<TrialResponse> result = await _trialService.GetIncomingAsync(query, tutorId, cancellationToken);
-        return Ok200(result);
-    }
-
-    [HttpPatch("/api/trials/{id:guid}/accept")]
+    [HttpPatch("{id:guid}/accept")]
     [Authorize(Roles = "Tutor")]
     public async Task<IActionResult> Accept(Guid id, CancellationToken cancellationToken)
     {
-        var tutorId = ReadCallerIdOrThrow();
-        TrialResponse result = await _trialService.RespondAsync(id, tutorId, accept: true, cancellationToken);
-        return Ok200(result, "Trial request accepted");
-    }
+        var (userId, _) = ReadCallerOrThrow();
 
-    [HttpPatch("/api/trials/{id:guid}/decline")]
-    [Authorize(Roles = "Tutor")]
-    public async Task<IActionResult> Decline(Guid id, CancellationToken cancellationToken)
-    {
-        var tutorId = ReadCallerIdOrThrow();
-        TrialResponse result = await _trialService.RespondAsync(id, tutorId, accept: false, cancellationToken);
-        return Ok200(result, "Trial request declined");
-    }
+        TrialResponse result = await _trialService.AcceptAsync(id, userId, cancellationToken);
 
-    private IActionResult Ok200<T>(T data, string message = "Success") where T : class =>
-        StatusCode(StatusCodes.Status200OK, new ApiResponse<T>
+        ApiResponse<TrialResponse> apiResponse = new()
         {
             StatusCode = StatusCodes.Status200OK,
-            Message = message,
-            Data = data
-        });
+            Message = "Trial accepted",
+            Data = result
+        };
 
-    private Guid ReadCallerIdOrThrow()
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
+
+    [HttpPatch("{id:guid}/reject")]
+    [Authorize(Roles = "Tutor")]
+    public async Task<IActionResult> Reject(Guid id, [FromBody] RejectTrialRequest request, CancellationToken cancellationToken)
+    {
+        var (userId, _) = ReadCallerOrThrow();
+
+        TrialResponse result = await _trialService.RejectAsync(id, userId, request ?? new RejectTrialRequest(), cancellationToken);
+
+        ApiResponse<TrialResponse> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Trial rejected",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
+
+    [HttpPatch("{id:guid}/complete")]
+    [Authorize(Roles = "Student,Parent")]
+    public async Task<IActionResult> Complete(Guid id, [FromBody] CompleteTrialRequest request, CancellationToken cancellationToken)
+    {
+        var (userId, role) = ReadCallerOrThrow();
+
+        TrialResponse result = await _trialService.CompleteAsync(id, userId, role, request ?? new CompleteTrialRequest(), cancellationToken);
+
+        ApiResponse<TrialResponse> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Trial completed",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
+
+    private (Guid UserId, string Role) ReadCallerOrThrow()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? throw new UnauthorizedAccessException("Missing user identifier claim.");
         if (!Guid.TryParse(userIdClaim, out var userId))
             throw new UnauthorizedAccessException("Invalid user identifier claim.");
-        return userId;
+
+        var role = User.FindFirst(ClaimTypes.Role)?.Value
+            ?? throw new UnauthorizedAccessException("Missing role claim.");
+
+        return (userId, role);
     }
 }

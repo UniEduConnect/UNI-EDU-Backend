@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,8 +6,14 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace UNI_EDU_Backend.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddNotificationsTrialsAndSettings : Migration
+    public partial class AddNotificationsAndSettings : Migration
     {
+        // NOTE: This migration only creates the genuinely-new Notifications + SystemSettings tables.
+        // The other model changes EF detected (Exam/Question/Submission columns, User.Status, AuditLogs,
+        // Messages, Incidents, Session.OfficeConfirmed) were already applied by earlier migrations
+        // (20260602*) on the shared database; they are reflected in the snapshot but intentionally
+        // NOT re-emitted here to avoid "already exists" errors.
+
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -60,63 +66,10 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
                     table.PrimaryKey("PK_SystemSettings", x => x.SettingID);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "TrialRequests",
-                columns: table => new
-                {
-                    TrialRequestID = table.Column<Guid>(type: "uuid", nullable: false),
-                    StudentID = table.Column<Guid>(type: "uuid", nullable: false),
-                    TutorID = table.Column<Guid>(type: "uuid", nullable: false),
-                    SubjectID = table.Column<Guid>(type: "uuid", nullable: true),
-                    Day = table.Column<string>(type: "text", nullable: false),
-                    Time = table.Column<string>(type: "text", nullable: false),
-                    Message = table.Column<string>(type: "text", nullable: true),
-                    Status = table.Column<int>(type: "integer", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    RespondedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TrialRequests", x => x.TrialRequestID);
-                    table.ForeignKey(
-                        name: "FK_TrialRequests_Students_StudentID",
-                        column: x => x.StudentID,
-                        principalTable: "Students",
-                        principalColumn: "StudentID",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_TrialRequests_Subjects_SubjectID",
-                        column: x => x.SubjectID,
-                        principalTable: "Subjects",
-                        principalColumn: "SubjectID",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_TrialRequests_Tutors_TutorID",
-                        column: x => x.TutorID,
-                        principalTable: "Tutors",
-                        principalColumn: "TutorID",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
             migrationBuilder.CreateIndex(
                 name: "IX_Notifications_UserID",
                 table: "Notifications",
                 column: "UserID");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TrialRequests_StudentID",
-                table: "TrialRequests",
-                column: "StudentID");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TrialRequests_SubjectID",
-                table: "TrialRequests",
-                column: "SubjectID");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TrialRequests_TutorID",
-                table: "TrialRequests",
-                column: "TutorID");
         }
 
         /// <inheritdoc />
@@ -127,9 +80,6 @@ namespace UNI_EDU_Backend.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "SystemSettings");
-
-            migrationBuilder.DropTable(
-                name: "TrialRequests");
         }
     }
 }

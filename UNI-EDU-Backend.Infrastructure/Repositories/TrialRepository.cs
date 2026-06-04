@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.Application.DTOs.Trials;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
@@ -11,96 +10,122 @@ public class TrialRepository(ApplicationDbContext dbContext) : ITrialRepository
 {
     private readonly ApplicationDbContext _dbContext = dbContext;
 
-    public Task<bool> TutorExistsAsync(Guid tutorId, CancellationToken cancellationToken) =>
-        _dbContext.Tutors.AnyAsync(t => t.TutorID == tutorId, cancellationToken);
-
-    public Task<bool> SubjectExistsAsync(Guid subjectId, CancellationToken cancellationToken) =>
-        _dbContext.Subjects.AnyAsync(s => s.SubjectID == subjectId, cancellationToken);
-
-    public async Task<TrialResponse> CreateAsync(Guid studentId, Guid tutorId, CreateTrialRequest request, CancellationToken cancellationToken)
+    public async Task<TrialResponse> CreateAsync(TrialBooking trial, CancellationToken cancellationToken)
     {
-        var entity = new TrialRequest
+        _dbContext.TrialBookings.Add(trial);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return await ProjectByIdAsync(trial.TrialID, cancellationToken);
+    }
+
+    public async Task<(List<TrialResponse> Items, int Total)> GetMyTrialsAsync(
+        Guid callerUserId, string callerRole, TrialStatus? status, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var query = _dbContext.TrialBookings.AsNoTracking().AsQueryable();
+
+        // Role scoping. The default branch yields an empty result rather than throwing —
+        // authorization (which roles can list at all) is enforced in the service.
+        query = callerRole switch
         {
-            TrialRequestID = Guid.NewGuid(),
-            StudentID = studentId,
-            TutorID = tutorId,
-            SubjectID = request.SubjectId,
-            Day = request.Day.Trim(),
-            Time = request.Time.Trim(),
-            Message = request.Message,
-            Status = TrialStatus.Pending,
-            CreatedAt = DateTime.UtcNow
+            "Tutor" => query.Where(t => t.TutorID == callerUserId),
+            "Student" => query.Where(t => t.StudentID == callerUserId),
+            "Parent" => query.Where(t => t.Student.ParentID == callerUserId),
+            "Admin" => query,
+            _ => query.Where(_ => false)
         };
 
-        _dbContext.TrialRequests.Add(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        if (status.HasValue)
+            query = query.Where(t => t.Status == status.Value);
 
-        return await ByIdAsync(entity.TrialRequestID, cancellationToken);
-    }
+        var total = await query.CountAsync(cancellationToken);
+        var skip = (page - 1) * pageSize;
 
-    public async Task<(List<TrialResponse> Items, int Total)> GetByStudentAsync(Guid studentId, TrialStatus? status, int page, int pageSize, CancellationToken cancellationToken)
-    {
-        var q = _dbContext.TrialRequests.AsNoTracking().Where(t => t.StudentID == studentId);
-        return await PageAsync(q, status, page, pageSize, cancellationToken);
-    }
-
-    public async Task<(List<TrialResponse> Items, int Total)> GetByTutorAsync(Guid tutorId, TrialStatus? status, int page, int pageSize, CancellationToken cancellationToken)
-    {
-        var q = _dbContext.TrialRequests.AsNoTracking().Where(t => t.TutorID == tutorId);
-        return await PageAsync(q, status, page, pageSize, cancellationToken);
-    }
-
-    public async Task<(TrialReviewOutcome Outcome, TrialResponse? Trial)> RespondAsync(Guid trialId, Guid tutorId, bool accept, CancellationToken cancellationToken)
-    {
-        var trial = await _dbContext.TrialRequests.FirstOrDefaultAsync(t => t.TrialRequestID == trialId, cancellationToken);
-        if (trial is null) return (TrialReviewOutcome.NotFound, null);
-        if (trial.TutorID != tutorId) return (TrialReviewOutcome.Forbidden, null);
-        if (trial.Status != TrialStatus.Pending) return (TrialReviewOutcome.AlreadyResponded, null);
-
-        trial.Status = accept ? TrialStatus.Accepted : TrialStatus.Declined;
-        trial.RespondedAt = DateTime.UtcNow;
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return (TrialReviewOutcome.Done, await ByIdAsync(trialId, cancellationToken));
-    }
-
-    private async Task<(List<TrialResponse> Items, int Total)> PageAsync(IQueryable<TrialRequest> q, TrialStatus? status, int page, int pageSize, CancellationToken cancellationToken)
-    {
-        if (status is not null)
-            q = q.Where(t => t.Status == status);
-
-        var total = await q.CountAsync(cancellationToken);
-        var items = await q
+        var items = await query
             .OrderByDescending(t => t.CreatedAt)
-            .Skip((page - 1) * pageSize)
+            .ThenBy(t => t.TrialID)
+            .Skip(skip)
             .Take(pageSize)
-            .Select(Projection)
+            .Select(t => new TrialResponse
+            {
+                Id = t.TrialID,
+                TutorId = t.TutorID,
+                TutorName = t.Tutor.FullName ?? string.Empty,
+                StudentId = t.StudentID,
+                StudentName = t.Student.FullName ?? string.Empty,
+                ParentId = t.ParentID,
+                SubjectId = t.SubjectID,
+                SubjectName = t.Subject.SubjectName ?? string.Empty,
+                RequestedAt = t.RequestedAt,
+                Goals = t.Goals,
+                CurrentLevel = t.CurrentLevel,
+                Note = t.Note,
+                Status = t.Status.ToString(),
+                ReviewedAt = t.ReviewedAt,
+                ReviewNote = t.ReviewNote,
+                CompletedAt = t.CompletedAt,
+                Feedback = t.Feedback,
+                Rating = t.Rating,
+                CreatedAt = t.CreatedAt
+            })
             .ToListAsync(cancellationToken);
 
         return (items, total);
     }
 
-    private Task<TrialResponse> ByIdAsync(Guid trialId, CancellationToken cancellationToken) =>
-        _dbContext.TrialRequests.AsNoTracking()
-            .Where(t => t.TrialRequestID == trialId)
-            .Select(Projection)
-            .FirstAsync(cancellationToken);
+    public Task<TrialBooking?> GetByIdAsync(Guid trialId, CancellationToken cancellationToken) =>
+        _dbContext.TrialBookings.FirstOrDefaultAsync(t => t.TrialID == trialId, cancellationToken);
 
-    private static readonly Expression<Func<TrialRequest, TrialResponse>> Projection =
-        t => new TrialResponse
-        {
-            Id = t.TrialRequestID,
-            StudentId = t.StudentID,
-            StudentName = t.Student.FullName ?? t.Student.User.Fullname,
-            TutorId = t.TutorID,
-            TutorName = t.Tutor.FullName ?? t.Tutor.User.Fullname,
-            SubjectId = t.SubjectID,
-            Subject = t.Subject != null ? t.Subject.SubjectName : null,
-            Day = t.Day,
-            Time = t.Time,
-            Message = t.Message,
-            Status = t.Status == TrialStatus.Accepted ? "accepted" : t.Status == TrialStatus.Declined ? "declined" : "pending",
-            CreatedAt = t.CreatedAt,
-            RespondedAt = t.RespondedAt
-        };
+    public async Task<TrialResponse> ApplyTransitionAsync(TrialBooking trial, TrialStatus newStatus, string? reviewNote, CancellationToken cancellationToken)
+    {
+        trial.Status = newStatus;
+        trial.ReviewedAt = DateTime.UtcNow;
+        if (reviewNote is not null)
+            trial.ReviewNote = reviewNote;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return await ProjectByIdAsync(trial.TrialID, cancellationToken);
+    }
+
+    public async Task<TrialResponse> ApplyCompletionAsync(TrialBooking trial, string? feedback, double? rating, CancellationToken cancellationToken)
+    {
+        trial.Status = TrialStatus.Completed;
+        trial.CompletedAt = DateTime.UtcNow;
+        if (feedback is not null)
+            trial.Feedback = feedback;
+        if (rating.HasValue)
+            trial.Rating = rating.Value;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return await ProjectByIdAsync(trial.TrialID, cancellationToken);
+    }
+
+    private Task<TrialResponse> ProjectByIdAsync(Guid trialId, CancellationToken cancellationToken) =>
+        _dbContext.TrialBookings
+            .AsNoTracking()
+            .Where(t => t.TrialID == trialId)
+            .Select(t => new TrialResponse
+            {
+                Id = t.TrialID,
+                TutorId = t.TutorID,
+                TutorName = t.Tutor.FullName ?? string.Empty,
+                StudentId = t.StudentID,
+                StudentName = t.Student.FullName ?? string.Empty,
+                ParentId = t.ParentID,
+                SubjectId = t.SubjectID,
+                SubjectName = t.Subject.SubjectName ?? string.Empty,
+                RequestedAt = t.RequestedAt,
+                Goals = t.Goals,
+                CurrentLevel = t.CurrentLevel,
+                Note = t.Note,
+                Status = t.Status.ToString(),
+                ReviewedAt = t.ReviewedAt,
+                ReviewNote = t.ReviewNote,
+                CompletedAt = t.CompletedAt,
+                Feedback = t.Feedback,
+                Rating = t.Rating,
+                CreatedAt = t.CreatedAt
+            })
+            .FirstAsync(cancellationToken);
 }
