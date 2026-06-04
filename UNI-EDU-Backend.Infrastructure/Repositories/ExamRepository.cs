@@ -260,6 +260,34 @@ public class ExamRepository(ApplicationDbContext dbContext) : IExamRepository
         return (items, total);
     }
 
+    public async Task<List<ExamStatItem>> GetStatsAsync(CancellationToken cancellationToken)
+    {
+        var rows = await _dbContext.Exams
+            .AsNoTracking()
+            .Select(e => new
+            {
+                e.ExamID,
+                e.Title,
+                Subject = e.Subject.SubjectName,
+                e.ScoreScale,
+                Attempts = e.Submissions.Count(),
+                SumScore = e.Submissions.Sum(s => (double?)s.Score) ?? 0d,
+                PassCount = e.Submissions.Count(s => s.Score >= e.ScoreScale / 2.0)
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(r => new ExamStatItem
+        {
+            ExamId = r.ExamID,
+            Title = r.Title,
+            Subject = r.Subject,
+            ScoreScale = r.ScoreScale,
+            Attempts = r.Attempts,
+            AvgScore = r.Attempts > 0 ? Math.Round(r.SumScore / r.Attempts, 2) : 0d,
+            PassRate = r.Attempts > 0 ? Math.Round(r.PassCount * 100.0 / r.Attempts, 1) : 0d
+        }).ToList();
+    }
+
     private void AddExamQuestions(int examId, List<int> questionIds)
     {
         var order = 1;

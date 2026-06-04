@@ -32,4 +32,7 @@ public interface IExamRepository
 
     Task<(List<SubmissionResponse> Items, int Total)> GetSubmissionsByExamAsync(int examId, int page, int pageSize, CancellationToken cancellationToken);
     Task<(List<SubmissionResponse> Items, int Total)> GetSubmissionsByUserAsync(Guid userId, int page, int pageSize, CancellationToken cancellationToken);
+
+    // Per-exam aggregate analytics for the exam-manager stats screen.
+    Task<List<ExamStatItem>> GetStatsAsync(CancellationToken cancellationToken);
 }

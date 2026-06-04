@@ -165,6 +165,9 @@ public class ExamService(
         };
     }
 
+    public Task<List<ExamStatItem>> GetStatsAsync(CancellationToken cancellationToken) =>
+        _examRepo.GetStatsAsync(cancellationToken);
+
     private async Task EnsureQuestionsExistAsync(List<int> questionIds, CancellationToken cancellationToken)
     {
         var missing = await _examRepo.GetMissingQuestionIdsAsync(questionIds, cancellationToken);

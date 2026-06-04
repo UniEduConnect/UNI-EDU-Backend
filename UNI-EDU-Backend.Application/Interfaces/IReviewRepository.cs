@@ -14,4 +14,7 @@ public interface IReviewRepository
 
     // Inserts the review and recomputes the tutor's average rating (one transaction).
     Task<ReviewResponse> CreateAsync(Guid classId, Guid tutorId, Guid reviewerId, int rating, string? comment, CancellationToken cancellationToken);
+
+    // Reviews written by the given reviewer (student/parent), newest first.
+    Task<(List<MyReviewResponse> Items, int Total)> GetByReviewerAsync(Guid reviewerId, int page, int pageSize, CancellationToken cancellationToken);
 }

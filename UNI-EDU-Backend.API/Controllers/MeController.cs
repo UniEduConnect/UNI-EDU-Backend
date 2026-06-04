@@ -2,20 +2,24 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UNI_EDU_Backend.API.Commons;
+using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Chat;
 using UNI_EDU_Backend.Application.DTOs.Classes;
+using UNI_EDU_Backend.Application.DTOs.Reviews;
 using UNI_EDU_Backend.Application.Services.Chat;
 using UNI_EDU_Backend.Application.Services.Profile;
+using UNI_EDU_Backend.Application.Services.Reviews;
 using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
 
 namespace UNI_EDU_Backend.API.Controllers;
 
 [ApiController]
 [Authorize]
-public class MeController(IProfileService profileService, IChatService chatService) : ControllerBase
+public class MeController(IProfileService profileService, IChatService chatService, IReviewService reviewService) : ControllerBase
 {
     private readonly IProfileService _profileService = profileService;
     private readonly IChatService _chatService = chatService;
+    private readonly IReviewService _reviewService = reviewService;
 
     // All of the caller's sessions across every class, optional date window.
     [HttpGet("/api/me/sessions")]
@@ -43,6 +47,21 @@ public class MeController(IProfileService profileService, IChatService chatServi
         {
             StatusCode = StatusCodes.Status200OK,
             Message = "Get conversations successfully",
+            Data = result
+        });
+    }
+
+    // Reviews the caller (student/parent) has written.
+    [HttpGet("/api/me/reviews")]
+    public async Task<IActionResult> GetMyReviews([FromQuery] int page, CancellationToken cancellationToken)
+    {
+        var (userId, _) = ReadCallerOrThrow();
+        PagedResult<MyReviewResponse> result = await _reviewService.GetMyReviewsAsync(userId, page < 1 ? 1 : page, cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<PagedResult<MyReviewResponse>>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get my reviews successfully",
             Data = result
         });
     }

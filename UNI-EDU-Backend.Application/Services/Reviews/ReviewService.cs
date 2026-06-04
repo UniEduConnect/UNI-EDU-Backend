@@ -37,4 +37,19 @@ public class ReviewService(
 
         return await _reviewRepo.CreateAsync(classId, ctx.TutorId, callerUserId, request.Rating, request.Comment, cancellationToken);
     }
+
+    public async Task<PagedResult<MyReviewResponse>> GetMyReviewsAsync(Guid reviewerId, int page, CancellationToken cancellationToken)
+    {
+        page = page < 1 ? 1 : page;
+        const int pageSize = 10;
+        var (items, total) = await _reviewRepo.GetByReviewerAsync(reviewerId, page, pageSize, cancellationToken);
+
+        return new PagedResult<MyReviewResponse>
+        {
+            Items = items,
+            Total = total,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
 }

@@ -63,4 +63,31 @@ public class ReviewRepository(ApplicationDbContext dbContext) : IReviewRepositor
             Date = now
         };
     }
+
+    public async Task<(List<MyReviewResponse> Items, int Total)> GetByReviewerAsync(Guid reviewerId, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var q = _dbContext.Reviews.AsNoTracking().Where(r => r.ReviewerID == reviewerId);
+        var total = await q.CountAsync(cancellationToken);
+
+        var items = await q
+            .OrderByDescending(r => r.ReviewDate)
+            .ThenByDescending(r => r.ReviewID)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(r => new MyReviewResponse
+            {
+                Id = r.ReviewID,
+                ClassId = r.ClassID,
+                ClassName = r.Class.Name,
+                TutorId = r.TutorID,
+                TutorName = r.Tutor.FullName ?? r.Tutor.User.Fullname,
+                Subject = r.Class.Subject.SubjectName,
+                Rating = r.Rating,
+                Comment = r.Comment,
+                Date = r.ReviewDate
+            })
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
 }

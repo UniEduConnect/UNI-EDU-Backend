@@ -120,8 +120,24 @@ public class ExamsController(IExamService examService) : ControllerBase
         });
     }
 
-    // All attempts for an exam (exam-manager analytics).
+    // Per-exam aggregate analytics (exam-manager stats screen).
+    [HttpGet("stats")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetStats(CancellationToken cancellationToken)
+    {
+        List<ExamStatItem> result = await _examService.GetStatsAsync(cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<List<ExamStatItem>>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get exam stats successfully",
+            Data = result
+        });
+    }
+
+    // All attempts for an exam (exam-manager analytics). Available as both /submissions and /attempts.
     [HttpGet("{id:int}/submissions")]
+    [HttpGet("{id:int}/attempts")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetExamSubmissions(int id, [FromQuery] int page, CancellationToken cancellationToken)
     {
