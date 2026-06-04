@@ -35,6 +35,7 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<SystemSetting> SystemSettings { get; set; }
         public DbSet<TrialBooking> TrialBookings { get; set; }
+        public DbSet<RefundRequest> RefundRequests { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -248,6 +249,25 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasForeignKey(n => n.UserID)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // RefundRequest: cascade with its class; null out requester/reviewer links on user delete.
+            modelBuilder.Entity<RefundRequest>()
+                .HasOne(r => r.Class)
+                .WithMany()
+                .HasForeignKey(r => r.ClassID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RefundRequest>()
+                .HasOne(r => r.Requester)
+                .WithMany()
+                .HasForeignKey(r => r.RequesterUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<RefundRequest>()
+                .HasOne(r => r.Reviewer)
+                .WithMany()
+                .HasForeignKey(r => r.ReviewerID)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Postgres array / jsonb columns on Tutor
             modelBuilder.Entity<Tutor>()
                 .Property(t => t.Certificates)
@@ -270,6 +290,14 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasConversion(
                     v => JsonSerializer.Serialize(v ?? new List<ClassScheduleSlot>(), JsonbOptions),
                     v => DeserializeJsonList<ClassScheduleSlot>(v));
+
+            // Student weekly availability (jsonb), mirroring Tutor.AvailableSlots.
+            modelBuilder.Entity<Student>()
+                .Property(s => s.AvailableSlots)
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v ?? new List<AvailableSlot>(), JsonbOptions),
+                    v => DeserializeJsonList<AvailableSlot>(v));
 
             // Homework attachment URLs captured when a tutor ends a session (nullable text[]).
             modelBuilder.Entity<Session>()

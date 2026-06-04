@@ -7,4 +7,7 @@ public interface IReviewService
 {
     Task<ReviewResponse> CreateClassReviewAsync(Guid classId, CreateReviewRequest request, Guid callerUserId, string callerRole, CancellationToken cancellationToken);
     Task<PagedResult<MyReviewResponse>> GetMyReviewsAsync(Guid reviewerId, int page, CancellationToken cancellationToken);
+
+    Task<PagedResult<ModerationReviewResponse>> GetForModerationAsync(ReviewModerationListQuery query, CancellationToken cancellationToken);
+    Task SetHiddenAsync(int reviewId, bool hidden, CancellationToken cancellationToken);
 }

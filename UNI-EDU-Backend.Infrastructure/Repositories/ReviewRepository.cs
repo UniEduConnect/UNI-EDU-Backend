@@ -90,4 +90,55 @@ public class ReviewRepository(ApplicationDbContext dbContext) : IReviewRepositor
 
         return (items, total);
     }
+
+    public async Task<(List<ModerationReviewResponse> Items, int Total)> GetForModerationAsync(bool? hidden, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var q = _dbContext.Reviews.AsNoTracking().AsQueryable();
+        if (hidden is bool h) q = q.Where(r => r.IsHidden == h);
+
+        var total = await q.CountAsync(cancellationToken);
+        var items = await q
+            .OrderByDescending(r => r.ReviewDate)
+            .ThenByDescending(r => r.ReviewID)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(r => new ModerationReviewResponse
+            {
+                Id = r.ReviewID,
+                ClassId = r.ClassID,
+                ClassName = r.Class.Name,
+                TutorName = r.Tutor.FullName ?? r.Tutor.User.Fullname,
+                StudentName = r.Reviewer.Fullname,
+                Rating = r.Rating,
+                Comment = r.Comment,
+                Date = r.ReviewDate,
+                Hidden = r.IsHidden
+            })
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
+
+    public async Task<bool> SetHiddenAsync(int reviewId, bool hidden, CancellationToken cancellationToken)
+    {
+        var review = await _dbContext.Reviews.FirstOrDefaultAsync(r => r.ReviewID == reviewId, cancellationToken);
+        if (review is null) return false;
+
+        review.IsHidden = hidden;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Recompute the tutor's average over VISIBLE reviews only.
+        var average = await _dbContext.Reviews
+            .Where(r => r.TutorID == review.TutorID && !r.IsHidden)
+            .AverageAsync(r => (double?)r.Rating, cancellationToken) ?? 0d;
+
+        var tutor = await _dbContext.Tutors.FirstOrDefaultAsync(t => t.TutorID == review.TutorID, cancellationToken);
+        if (tutor is not null)
+        {
+            tutor.AverageRating = (float)average;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return true;
+    }
 }

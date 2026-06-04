@@ -27,6 +27,7 @@ using UNI_EDU_Backend.Application.Services.Office;
 using UNI_EDU_Backend.Application.Services.Profile;
 using UNI_EDU_Backend.Application.Services.Notifications;
 using UNI_EDU_Backend.Application.Services.Dashboards;
+using UNI_EDU_Backend.Application.Services.Refunds;
 using UNI_EDU_Backend.Infrastructure;
 using UNI_EDU_Backend.Infrastructure.Payments;
 using UNI_EDU_Backend.Infrastructure.Repositories;
@@ -72,6 +73,7 @@ builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<ITrialRepository, TrialRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
+builder.Services.AddScoped<IRefundRepository, RefundRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IParentRepository, ParentRepository>();
 
@@ -96,6 +98,7 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITrialService, TrialService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IRefundService, RefundService>();
 
 // Payment gateways (Momo + VNPay). Both register as IPaymentGateway so the deposit service
 // resolves the right one by Method. Settings bound from "Momo" / "VnPay" config sections.

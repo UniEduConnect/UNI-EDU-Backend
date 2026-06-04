@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.DTOs.Profile;
+using UNI_EDU_Backend.Application.DTOs.Tutors;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Enums;
 using UNI_EDU_Backend.Domain.Models;
@@ -187,6 +188,29 @@ public class ProfileRepository(ApplicationDbContext dbContext) : IProfileReposit
 
         if (request.FullName is not null) parent.FullName = request.FullName.Trim();
 
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<List<AvailableSlotDto>?> GetStudentAvailabilityAsync(Guid studentId, CancellationToken cancellationToken)
+    {
+        var row = await _dbContext.Students.AsNoTracking()
+            .Where(s => s.StudentID == studentId)
+            .Select(s => new { s.AvailableSlots })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return row is null
+            ? null
+            : (row.AvailableSlots ?? new List<AvailableSlot>())
+                .Select(a => new AvailableSlotDto { Day = a.Day, Time = a.Time }).ToList();
+    }
+
+    public async Task<bool> SaveStudentAvailabilityAsync(Guid studentId, List<AvailableSlot> slots, CancellationToken cancellationToken)
+    {
+        var student = await _dbContext.Students.FirstOrDefaultAsync(s => s.StudentID == studentId, cancellationToken);
+        if (student is null) return false;
+
+        student.AvailableSlots = slots;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }

@@ -61,7 +61,7 @@ public class DashboardRepository(ApplicationDbContext dbContext) : IDashboardRep
                 .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m,
             PendingWithdrawals = await _dbContext.Withdrawals.CountAsync(w => w.Status == WithdrawalStatus.Pending, cancellationToken),
             TotalEscrow = await _dbContext.Wallets.SumAsync(w => (decimal?)w.EscrowBalance, cancellationToken) ?? 0m,
-            RefundsPending = 0 // Refund requests feature pending.
+            RefundsPending = await _dbContext.RefundRequests.CountAsync(r => r.Status == RefundStatus.Pending, cancellationToken)
         };
     }
 

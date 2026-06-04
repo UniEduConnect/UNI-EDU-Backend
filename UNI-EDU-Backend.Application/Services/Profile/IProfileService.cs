@@ -17,4 +17,7 @@ public interface IProfileService
 
     Task<List<ScheduleItemResponse>> GetMyScheduleAsync(Guid userId, string role, CancellationToken cancellationToken);
     Task<List<UNI_EDU_Backend.Application.DTOs.Classes.SessionResponse>> GetMySessionsAsync(Guid userId, string role, DateTime? from, DateTime? to, CancellationToken cancellationToken);
+
+    Task<List<UNI_EDU_Backend.Application.DTOs.Tutors.AvailableSlotDto>> GetMyStudentAvailabilityAsync(Guid studentId, CancellationToken cancellationToken);
+    Task<List<UNI_EDU_Backend.Application.DTOs.Tutors.AvailableSlotDto>> UpdateMyStudentAvailabilityAsync(Guid studentId, UNI_EDU_Backend.Application.DTOs.Tutors.UpdateAvailabilityRequest request, CancellationToken cancellationToken);
 }

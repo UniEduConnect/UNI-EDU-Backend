@@ -17,4 +17,10 @@ public interface IReviewRepository
 
     // Reviews written by the given reviewer (student/parent), newest first.
     Task<(List<MyReviewResponse> Items, int Total)> GetByReviewerAsync(Guid reviewerId, int page, int pageSize, CancellationToken cancellationToken);
+
+    // Moderation listing. hidden=null → all, true → hidden only, false → visible only.
+    Task<(List<ModerationReviewResponse> Items, int Total)> GetForModerationAsync(bool? hidden, int page, int pageSize, CancellationToken cancellationToken);
+
+    // Hide/unhide a review; recomputes the tutor's average over visible reviews. False if not found.
+    Task<bool> SetHiddenAsync(int reviewId, bool hidden, CancellationToken cancellationToken);
 }

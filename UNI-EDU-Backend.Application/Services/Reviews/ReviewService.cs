@@ -52,4 +52,26 @@ public class ReviewService(
             PageSize = pageSize
         };
     }
+
+    public async Task<PagedResult<ModerationReviewResponse>> GetForModerationAsync(ReviewModerationListQuery query, CancellationToken cancellationToken)
+    {
+        var page = query.Page < 1 ? 1 : query.Page;
+        const int pageSize = 10;
+
+        bool? hidden = (query.Status ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "hidden" => true,
+            "visible" => false,
+            _ => null
+        };
+
+        var (items, total) = await _reviewRepo.GetForModerationAsync(hidden, page, pageSize, cancellationToken);
+        return new PagedResult<ModerationReviewResponse> { Items = items, Total = total, Page = page, PageSize = pageSize };
+    }
+
+    public async Task SetHiddenAsync(int reviewId, bool hidden, CancellationToken cancellationToken)
+    {
+        if (!await _reviewRepo.SetHiddenAsync(reviewId, hidden, cancellationToken))
+            throw new NotFoundException($"Review with id '{reviewId}' not found.");
+    }
 }

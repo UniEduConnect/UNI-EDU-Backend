@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UNI_EDU_Backend.API.Commons;
 using UNI_EDU_Backend.Application.DTOs.Profile;
+using UNI_EDU_Backend.Application.DTOs.Tutors;
 using UNI_EDU_Backend.Application.Services.Profile;
 using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
 
@@ -39,6 +40,32 @@ public class StudentsController(IProfileService profileService) : ControllerBase
         {
             StatusCode = StatusCodes.Status200OK,
             Message = "Student profile updated successfully",
+            Data = result
+        });
+    }
+
+    [HttpGet("me/availability")]
+    public async Task<IActionResult> GetMyAvailability(CancellationToken cancellationToken)
+    {
+        List<AvailableSlotDto> result = await _profileService.GetMyStudentAvailabilityAsync(ReadCallerIdOrThrow(), cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<List<AvailableSlotDto>>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get availability successfully",
+            Data = result
+        });
+    }
+
+    [HttpPut("me/availability")]
+    public async Task<IActionResult> UpdateMyAvailability([FromBody] UpdateAvailabilityRequest request, CancellationToken cancellationToken)
+    {
+        List<AvailableSlotDto> result = await _profileService.UpdateMyStudentAvailabilityAsync(ReadCallerIdOrThrow(), request, cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<List<AvailableSlotDto>>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Availability updated successfully",
             Data = result
         });
     }

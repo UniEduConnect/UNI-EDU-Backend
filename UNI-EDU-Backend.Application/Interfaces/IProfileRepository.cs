@@ -1,10 +1,16 @@
 using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.DTOs.Profile;
+using UNI_EDU_Backend.Application.DTOs.Tutors;
+using UNI_EDU_Backend.Domain.Models;
 
 namespace UNI_EDU_Backend.Application.Interfaces.Repositories;
 
 public interface IProfileRepository
 {
+    // Student weekly availability (mirrors tutor availability). Get returns null if the student is missing.
+    Task<List<AvailableSlotDto>?> GetStudentAvailabilityAsync(Guid studentId, CancellationToken cancellationToken);
+    Task<bool> SaveStudentAvailabilityAsync(Guid studentId, List<AvailableSlot> slots, CancellationToken cancellationToken);
+
     // All of the caller's sessions across their classes, optionally filtered by date window.
     Task<List<SessionResponse>> GetMySessionsAsync(Guid userId, string role, DateTime? from, DateTime? to, CancellationToken cancellationToken);
 

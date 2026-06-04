@@ -1,6 +1,7 @@
 using FluentValidation;
 using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Profile;
+using UNI_EDU_Backend.Application.DTOs.Tutors;
 using UNI_EDU_Backend.Application.Exceptions;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
 
@@ -11,13 +12,15 @@ public class ProfileService(
     IValidator<UpdateMeRequest> updateMeValidator,
     IValidator<UpdateTutorProfileRequest> tutorValidator,
     IValidator<UpdateStudentProfileRequest> studentValidator,
-    IValidator<UpdateParentProfileRequest> parentValidator) : IProfileService
+    IValidator<UpdateParentProfileRequest> parentValidator,
+    IValidator<UpdateAvailabilityRequest> availabilityValidator) : IProfileService
 {
     private readonly IProfileRepository _profileRepo = profileRepo;
     private readonly IValidator<UpdateMeRequest> _updateMeValidator = updateMeValidator;
     private readonly IValidator<UpdateTutorProfileRequest> _tutorValidator = tutorValidator;
     private readonly IValidator<UpdateStudentProfileRequest> _studentValidator = studentValidator;
     private readonly IValidator<UpdateParentProfileRequest> _parentValidator = parentValidator;
+    private readonly IValidator<UpdateAvailabilityRequest> _availabilityValidator = availabilityValidator;
 
     public async Task<CurrentUserResponse> GetMeAsync(Guid userId, CancellationToken cancellationToken) =>
         await _profileRepo.GetCurrentUserAsync(userId, cancellationToken)
@@ -83,4 +86,22 @@ public class ProfileService(
 
     public Task<List<DTOs.Classes.SessionResponse>> GetMySessionsAsync(Guid userId, string role, DateTime? from, DateTime? to, CancellationToken cancellationToken) =>
         _profileRepo.GetMySessionsAsync(userId, role, from, to, cancellationToken);
+
+    public async Task<List<AvailableSlotDto>> GetMyStudentAvailabilityAsync(Guid studentId, CancellationToken cancellationToken) =>
+        await _profileRepo.GetStudentAvailabilityAsync(studentId, cancellationToken)
+            ?? throw new NotFoundException("Student profile not found.");
+
+    public async Task<List<AvailableSlotDto>> UpdateMyStudentAvailabilityAsync(Guid studentId, UpdateAvailabilityRequest request, CancellationToken cancellationToken)
+    {
+        await _availabilityValidator.EnsureValidAsync(request, cancellationToken);
+
+        var slots = request.Slots
+            .Select(s => new Domain.Models.AvailableSlot { Day = s.Day.Trim(), Time = s.Time.Trim() })
+            .ToList();
+
+        if (!await _profileRepo.SaveStudentAvailabilityAsync(studentId, slots, cancellationToken))
+            throw new NotFoundException("Student profile not found.");
+
+        return request.Slots.Select(s => new AvailableSlotDto { Day = s.Day.Trim(), Time = s.Time.Trim() }).ToList();
+    }
 }
