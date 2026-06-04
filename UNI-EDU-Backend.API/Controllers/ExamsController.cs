@@ -120,6 +120,32 @@ public class ExamsController(IExamService examService) : ControllerBase
         });
     }
 
+    [HttpGet("ai-config")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAiConfig(CancellationToken cancellationToken)
+    {
+        ExamAiConfigResponse result = await _examService.GetAiConfigAsync(cancellationToken);
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<ExamAiConfigResponse>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get AI config successfully",
+            Data = result
+        });
+    }
+
+    [HttpPut("ai-config")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateAiConfig([FromBody] UpdateExamAiConfigRequest request, CancellationToken cancellationToken)
+    {
+        ExamAiConfigResponse result = await _examService.UpdateAiConfigAsync(request, cancellationToken);
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<ExamAiConfigResponse>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "AI config updated successfully",
+            Data = result
+        });
+    }
+
     // Per-exam aggregate analytics (exam-manager stats screen).
     [HttpGet("stats")]
     [Authorize(Roles = "Admin")]

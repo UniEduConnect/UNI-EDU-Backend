@@ -16,4 +16,6 @@ public interface IExamService
     Task<PagedResult<SubmissionResponse>> GetExamSubmissionsAsync(int examId, int page, CancellationToken cancellationToken);
     Task<PagedResult<SubmissionResponse>> GetMySubmissionsAsync(Guid userId, int page, CancellationToken cancellationToken);
     Task<List<ExamStatItem>> GetStatsAsync(CancellationToken cancellationToken);
+    Task<ExamAiConfigResponse> GetAiConfigAsync(CancellationToken cancellationToken);
+    Task<ExamAiConfigResponse> UpdateAiConfigAsync(UpdateExamAiConfigRequest request, CancellationToken cancellationToken);
 }

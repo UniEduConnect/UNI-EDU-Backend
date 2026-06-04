@@ -36,6 +36,8 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<SystemSetting> SystemSettings { get; set; }
         public DbSet<TrialBooking> TrialBookings { get; set; }
         public DbSet<RefundRequest> RefundRequests { get; set; }
+        public DbSet<Appointment> Appointments { get; set; }
+        public DbSet<ExamAiConfig> ExamAiConfigs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -266,6 +268,13 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasOne(r => r.Reviewer)
                 .WithMany()
                 .HasForeignKey(r => r.ReviewerID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Appointment: optional link to a user (null out on user delete).
+            modelBuilder.Entity<Appointment>()
+                .HasOne(a => a.WithUser)
+                .WithMany()
+                .HasForeignKey(a => a.WithUserId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             // Postgres array / jsonb columns on Tutor

@@ -288,6 +288,52 @@ public class ExamRepository(ApplicationDbContext dbContext) : IExamRepository
         }).ToList();
     }
 
+    public async Task<ExamAiConfigResponse> GetAiConfigAsync(CancellationToken cancellationToken)
+    {
+        var config = await GetOrCreateAiConfigAsync(cancellationToken);
+        return MapAiConfig(config);
+    }
+
+    public async Task<ExamAiConfigResponse> UpdateAiConfigAsync(UpdateExamAiConfigRequest request, CancellationToken cancellationToken)
+    {
+        var c = await GetOrCreateAiConfigAsync(cancellationToken);
+        c.ProctoringEnabled = request.ProctoringEnabled;
+        c.FaceDetection = request.FaceDetection;
+        c.FullscreenRequired = request.FullscreenRequired;
+        c.CopyPasteBlocked = request.CopyPasteBlocked;
+        c.TabSwitchLimit = request.TabSwitchLimit;
+        c.AutoGenerateEnabled = request.AutoGenerateEnabled;
+        c.DefaultDifficulty = (request.DefaultDifficulty ?? "medium").Trim().ToLowerInvariant();
+        c.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapAiConfig(c);
+    }
+
+    private async Task<ExamAiConfig> GetOrCreateAiConfigAsync(CancellationToken cancellationToken)
+    {
+        var config = await _dbContext.ExamAiConfigs.FirstOrDefaultAsync(cancellationToken);
+        if (config is null)
+        {
+            config = new ExamAiConfig { ConfigID = Guid.NewGuid(), UpdatedAt = DateTime.UtcNow };
+            _dbContext.ExamAiConfigs.Add(config);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        return config;
+    }
+
+    private static ExamAiConfigResponse MapAiConfig(ExamAiConfig c) => new()
+    {
+        ProctoringEnabled = c.ProctoringEnabled,
+        FaceDetection = c.FaceDetection,
+        FullscreenRequired = c.FullscreenRequired,
+        CopyPasteBlocked = c.CopyPasteBlocked,
+        TabSwitchLimit = c.TabSwitchLimit,
+        AutoGenerateEnabled = c.AutoGenerateEnabled,
+        DefaultDifficulty = c.DefaultDifficulty,
+        UpdatedAt = c.UpdatedAt
+    };
+
     private void AddExamQuestions(int examId, List<int> questionIds)
     {
         var order = 1;

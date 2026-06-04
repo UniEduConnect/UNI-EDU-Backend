@@ -168,6 +168,12 @@ public class ExamService(
     public Task<List<ExamStatItem>> GetStatsAsync(CancellationToken cancellationToken) =>
         _examRepo.GetStatsAsync(cancellationToken);
 
+    public Task<ExamAiConfigResponse> GetAiConfigAsync(CancellationToken cancellationToken) =>
+        _examRepo.GetAiConfigAsync(cancellationToken);
+
+    public Task<ExamAiConfigResponse> UpdateAiConfigAsync(UpdateExamAiConfigRequest request, CancellationToken cancellationToken) =>
+        _examRepo.UpdateAiConfigAsync(request, cancellationToken);
+
     private async Task EnsureQuestionsExistAsync(List<int> questionIds, CancellationToken cancellationToken)
     {
         var missing = await _examRepo.GetMissingQuestionIdsAsync(questionIds, cancellationToken);

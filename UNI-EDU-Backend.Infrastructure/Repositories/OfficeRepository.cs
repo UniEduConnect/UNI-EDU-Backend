@@ -119,6 +119,79 @@ public class OfficeRepository(ApplicationDbContext dbContext) : IOfficeRepositor
         return IncidentReviewOutcome.Done;
     }
 
+    public async Task<(List<AppointmentResponse> Items, int Total)> GetAppointmentsAsync(AppointmentStatus? status, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var q = _dbContext.Appointments.AsNoTracking().AsQueryable();
+        if (status is not null) q = q.Where(a => a.Status == status);
+
+        var total = await q.CountAsync(cancellationToken);
+        var rows = await q
+            .OrderByDescending(a => a.ScheduledAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return (rows.Select(MapAppointment).ToList(), total);
+    }
+
+    public async Task<AppointmentResponse> CreateAppointmentAsync(SaveAppointmentRequest request, CancellationToken cancellationToken)
+    {
+        var entity = new Appointment
+        {
+            AppointmentID = Guid.NewGuid(),
+            Title = request.Title.Trim(),
+            Description = request.Description,
+            WithName = request.WithName,
+            WithUserId = request.WithUserId,
+            ScheduledAt = DateTime.SpecifyKind(request.ScheduledAt, DateTimeKind.Utc),
+            Status = AppointmentStatus.Scheduled,
+            Notes = request.Notes,
+            CreatedAt = DateTime.UtcNow
+        };
+        _dbContext.Appointments.Add(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapAppointment(entity);
+    }
+
+    public async Task<AppointmentResponse?> UpdateAppointmentAsync(Guid id, SaveAppointmentRequest request, CancellationToken cancellationToken)
+    {
+        var entity = await _dbContext.Appointments.FirstOrDefaultAsync(a => a.AppointmentID == id, cancellationToken);
+        if (entity is null) return null;
+
+        entity.Title = request.Title.Trim();
+        entity.Description = request.Description;
+        entity.WithName = request.WithName;
+        entity.WithUserId = request.WithUserId;
+        entity.ScheduledAt = DateTime.SpecifyKind(request.ScheduledAt, DateTimeKind.Utc);
+        entity.Notes = request.Notes;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapAppointment(entity);
+    }
+
+    public async Task<bool> SetAppointmentStatusAsync(Guid id, AppointmentStatus status, CancellationToken cancellationToken)
+    {
+        var entity = await _dbContext.Appointments.FirstOrDefaultAsync(a => a.AppointmentID == id, cancellationToken);
+        if (entity is null) return false;
+
+        entity.Status = status;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private static AppointmentResponse MapAppointment(Appointment a) => new()
+    {
+        Id = a.AppointmentID,
+        Title = a.Title,
+        Description = a.Description,
+        WithName = a.WithName,
+        WithUserId = a.WithUserId,
+        ScheduledAt = a.ScheduledAt,
+        Status = a.Status.ToString().ToLowerInvariant(),
+        Notes = a.Notes,
+        CreatedAt = a.CreatedAt
+    };
+
     private static List<SessionStatus>? WireToStatuses(string? wire) =>
         (wire ?? string.Empty).Trim().ToLowerInvariant() switch
         {

@@ -21,4 +21,10 @@ public interface IOfficeRepository
 
     // Transitions status (investigate/resolve). Returns NotFound if the incident is missing.
     Task<IncidentReviewOutcome> SetIncidentStatusAsync(Guid incidentId, IncidentStatus status, string? resolution, CancellationToken cancellationToken);
+
+    // Appointments
+    Task<(List<AppointmentResponse> Items, int Total)> GetAppointmentsAsync(AppointmentStatus? status, int page, int pageSize, CancellationToken cancellationToken);
+    Task<AppointmentResponse> CreateAppointmentAsync(SaveAppointmentRequest request, CancellationToken cancellationToken);
+    Task<AppointmentResponse?> UpdateAppointmentAsync(Guid id, SaveAppointmentRequest request, CancellationToken cancellationToken);
+    Task<bool> SetAppointmentStatusAsync(Guid id, AppointmentStatus status, CancellationToken cancellationToken);
 }

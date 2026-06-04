@@ -72,6 +72,76 @@ public class OfficeController(IOfficeService officeService) : ControllerBase
         return Ok200<object>(null, "Incident resolved");
     }
 
+    [HttpGet("registrations")]
+    public async Task<IActionResult> GetRegistrations([FromQuery] int page, CancellationToken cancellationToken)
+    {
+        var result = await _officeService.GetRegistrationsAsync(page < 1 ? 1 : page, cancellationToken);
+        return Ok200(result, "Get registrations successfully");
+    }
+
+    [HttpPost("registrations/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveRegistration(Guid id, CancellationToken cancellationToken)
+    {
+        var (userId, _, _) = ReadCallerOrThrow();
+        await _officeService.ApproveRegistrationAsync(id, userId, cancellationToken);
+        return Ok200<object>(null, "Registration approved");
+    }
+
+    [HttpPost("registrations/{id:guid}/reject")]
+    public async Task<IActionResult> RejectRegistration(Guid id, CancellationToken cancellationToken)
+    {
+        var (userId, _, _) = ReadCallerOrThrow();
+        await _officeService.RejectRegistrationAsync(id, userId, cancellationToken);
+        return Ok200<object>(null, "Registration rejected");
+    }
+
+    [HttpGet("appointments")]
+    public async Task<IActionResult> GetAppointments([FromQuery] AppointmentListQuery query, CancellationToken cancellationToken)
+    {
+        var result = await _officeService.GetAppointmentsAsync(query, cancellationToken);
+        return Ok200(result, "Get appointments successfully");
+    }
+
+    [HttpPost("appointments")]
+    public async Task<IActionResult> CreateAppointment([FromBody] SaveAppointmentRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _officeService.CreateAppointmentAsync(request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<AppointmentResponse>
+        {
+            StatusCode = StatusCodes.Status201Created,
+            Message = "Appointment created successfully",
+            Data = result
+        });
+    }
+
+    [HttpPut("appointments/{id:guid}")]
+    public async Task<IActionResult> UpdateAppointment(Guid id, [FromBody] SaveAppointmentRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _officeService.UpdateAppointmentAsync(id, request, cancellationToken);
+        return Ok200(result, "Appointment updated successfully");
+    }
+
+    [HttpPatch("appointments/{id:guid}/cancel")]
+    public async Task<IActionResult> CancelAppointment(Guid id, CancellationToken cancellationToken)
+    {
+        await _officeService.CancelAppointmentAsync(id, cancellationToken);
+        return Ok200<object>(null, "Appointment cancelled");
+    }
+
+    [HttpPatch("appointments/{id:guid}/complete")]
+    public async Task<IActionResult> CompleteAppointment(Guid id, CancellationToken cancellationToken)
+    {
+        await _officeService.CompleteAppointmentAsync(id, cancellationToken);
+        return Ok200<object>(null, "Appointment completed");
+    }
+
+    [HttpPost("ai-schedule")]
+    public IActionResult GenerateSchedule([FromBody] AiScheduleRequest request)
+    {
+        var result = _officeService.GenerateSchedule(request ?? new AiScheduleRequest());
+        return Ok200(result, "Schedule generated");
+    }
+
     private IActionResult Ok200<T>(T? data, string message) where T : class =>
         StatusCode(StatusCodes.Status200OK, new ApiResponse<T>
         {

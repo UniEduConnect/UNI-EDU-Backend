@@ -35,4 +35,8 @@ public interface IExamRepository
 
     // Per-exam aggregate analytics for the exam-manager stats screen.
     Task<List<ExamStatItem>> GetStatsAsync(CancellationToken cancellationToken);
+
+    // Single-row AI proctoring config (created with defaults on first access).
+    Task<ExamAiConfigResponse> GetAiConfigAsync(CancellationToken cancellationToken);
+    Task<ExamAiConfigResponse> UpdateAiConfigAsync(UpdateExamAiConfigRequest request, CancellationToken cancellationToken);
 }
