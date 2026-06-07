@@ -30,6 +30,9 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<ClassMaterial> ClassMaterials { get; set; }
         public DbSet<Withdrawal> Withdrawals { get; set; }
         public DbSet<TrialBooking> TrialBookings { get; set; }
+        public DbSet<ChatMessage> ChatMessages { get; set; }
+        public DbSet<DmMessage> DmMessages { get; set; }
+        public DbSet<ClassChatRead> ClassChatReads { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -224,6 +227,31 @@ namespace UNI_EDU_Backend.Infrastructure
             modelBuilder.Entity<Session>()
                 .Property(s => s.HomeworkFiles)
                 .HasColumnType("text[]");
+
+            // Class chat: message cascades with the class; the sender link is Restrict so a
+            // chat message never deletes a user.
+            modelBuilder.Entity<ChatMessage>()
+                .HasOne(m => m.Class)
+                .WithMany()
+                .HasForeignKey(m => m.ClassID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ChatMessage>()
+                .HasOne(m => m.Sender)
+                .WithMany()
+                .HasForeignKey(m => m.SenderID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ChatMessage>()
+                .HasIndex(m => new { m.ClassID, m.SentAt });
+
+            // Parent ↔ tutor DM: plain Guid columns, indexed by conversation pair for lookup.
+            modelBuilder.Entity<DmMessage>()
+                .HasIndex(d => new { d.TutorID, d.ParentID, d.SentAt });
+
+            // Per-(class, user) read marker for the class chat.
+            modelBuilder.Entity<ClassChatRead>()
+                .HasKey(r => new { r.ClassID, r.UserID });
         }
 
         // Shared options for jsonb columns. camelCase naming matches the on-disk shape

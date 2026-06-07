@@ -8,7 +8,10 @@ using System.Text;
 using UNI_EDU_Backend.API.Middleware;
 using UNI_EDU_Backend.Application.Mappings;
 using UNI_EDU_Backend.API.Json;
+using UNI_EDU_Backend.API.Realtime;
 using UNI_EDU_Backend.Application.Services.Classes;
+using UNI_EDU_Backend.Application.Services.ClassMaterials;
+using UNI_EDU_Backend.Application.Services.Chats;
 using UNI_EDU_Backend.Application.Services.Sessions;
 using UNI_EDU_Backend.Application.Services.Parents;
 using UNI_EDU_Backend.Application.Services.Trials;
@@ -28,6 +31,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSignalR();
 
 builder.Services
     .AddControllers()
@@ -46,6 +50,8 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IClassRepository, ClassRepository>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+builder.Services.AddScoped<IClassMaterialRepository, ClassMaterialRepository>();
+builder.Services.AddScoped<IChatRepository, ChatRepository>();
 builder.Services.AddScoped<IWalletRepository, WalletRepository>();
 builder.Services.AddScoped<IWithdrawalRepository, WithdrawalRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -58,6 +64,9 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ITutorService, TutorService>();
 builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<ISessionService, SessionService>();
+builder.Services.AddScoped<IClassMaterialService, ClassMaterialService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IChatNotifier, ChatNotifier>();
 builder.Services.AddScoped<IParentService, ParentService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<ITrialService, TrialService>();
@@ -151,6 +160,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         options.Events = new JwtBearerEvents
         {
+            // SignalR WebSocket clients can't set Authorization headers — read the JWT from the
+            // access_token query string on the hub path.
+            OnMessageReceived = ctx =>
+            {
+                var accessToken = ctx.Request.Query["access_token"];
+                var path = ctx.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+                    ctx.Token = accessToken;
+                return Task.CompletedTask;
+            },
             OnChallenge = ctx =>
             {
                 // Suppress the default empty 401 so the thrown exception reaches GlobalExceptionHandlerMiddleware.
@@ -200,5 +219,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.Run();
