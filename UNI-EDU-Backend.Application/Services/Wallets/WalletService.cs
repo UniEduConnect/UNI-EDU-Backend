@@ -15,17 +15,23 @@ public class WalletService(
     IValidator<TransactionListQuery> transactionsValidator,
     IValidator<DepositRequest> depositValidator,
     IValidator<CreateWithdrawalRequest> withdrawalValidator,
+    IValidator<DepositTestRequest> depositTestValidator,
     IEnumerable<IPaymentGateway> paymentGateways,
     IMomoGateway momoGateway,
     IVnPayGateway vnPayGateway) : IWalletService
 {
     private const int PageSize = 10;
 
+    // Used as the WalletTransaction.Method value for mock deposits. Real deposits use
+    // "momo" / "vnpay" / "bank"; the confirm endpoint refuses to settle anything except "test".
+    private const string TestMethod = "test";
+
     private readonly IWalletRepository _walletRepo = walletRepo;
     private readonly IWithdrawalRepository _withdrawalRepo = withdrawalRepo;
     private readonly IValidator<TransactionListQuery> _transactionsValidator = transactionsValidator;
     private readonly IValidator<DepositRequest> _depositValidator = depositValidator;
     private readonly IValidator<CreateWithdrawalRequest> _withdrawalValidator = withdrawalValidator;
+    private readonly IValidator<DepositTestRequest> _depositTestValidator = depositTestValidator;
     private readonly IEnumerable<IPaymentGateway> _paymentGateways = paymentGateways;
     private readonly IMomoGateway _momoGateway = momoGateway;
     private readonly IVnPayGateway _vnPayGateway = vnPayGateway;
@@ -173,6 +179,60 @@ public class WalletService(
         // Balance check + debit + insert happen atomically inside the repo (single DB transaction)
         // to prevent double-spend on concurrent requests.
         return await _withdrawalRepo.CreateAsync(callerUserId, request, cancellationToken);
+    }
+
+    public async Task<DepositResponse> InitiateTestDepositAsync(DepositTestRequest request, Guid callerUserId, CancellationToken cancellationToken)
+    {
+        await _depositTestValidator.EnsureValidAsync(request, cancellationToken);
+
+        var amount = Math.Truncate(request.Amount);
+        var orderId = $"DEP-TEST-{Guid.NewGuid():N}";
+        const string orderInfo = "Nap tien vao vi UNI-EDU (TEST)";
+
+        var transactionId = await _walletRepo.CreatePendingDepositAsync(
+            callerUserId, amount, TestMethod, orderId, orderInfo, cancellationToken);
+
+        return new DepositResponse
+        {
+            TransactionId = transactionId,
+            // No gateway, no redirect. UI calls /deposit-test/{transactionId}/confirm directly.
+            PayUrl = string.Empty,
+            Status = "pending"
+        };
+    }
+
+    public async Task<TestDepositConfirmResponse> ConfirmTestDepositAsync(Guid transactionId, Guid callerUserId, CancellationToken cancellationToken)
+    {
+        var lookup = await _walletRepo.LookupTestDepositAsync(transactionId, cancellationToken)
+            ?? throw new NotFoundException($"Deposit transaction '{transactionId}' not found.");
+
+        if (lookup.UserId != callerUserId)
+            throw new ForbiddenAccessException("You can only confirm your own test deposits.");
+
+        // Hard wall against this endpoint touching real Momo/VNPay pending rows. Those must
+        // settle through their real IPN with a verified signature.
+        if (!string.Equals(lookup.Method, TestMethod, StringComparison.OrdinalIgnoreCase))
+            throw new BadRequestException("This endpoint can only confirm test deposits.");
+
+        if (lookup.Status != WalletTxStatus.Pending)
+            throw new BadRequestException($"Deposit is no longer pending (current status: {lookup.Status}).");
+
+        var outcome = await _walletRepo.SettleDepositAsync(
+            lookup.OrderId, success: true, providerTxnId: $"MOCK-{Guid.NewGuid():N}", confirmedAmount: lookup.Amount, cancellationToken);
+
+        if (outcome != DepositSettleOutcome.Credited)
+            // Could happen if a concurrent confirm raced us through SettleDepositAsync. Surface
+            // as 400 so the UI can re-fetch the wallet and show the current state.
+            throw new BadRequestException($"Could not credit deposit (outcome: {outcome}).");
+
+        var balance = await _walletRepo.GetBalanceAsync(callerUserId, cancellationToken);
+
+        return new TestDepositConfirmResponse
+        {
+            TransactionId = transactionId,
+            Status = "completed",
+            Balance = balance
+        };
     }
 
     // Student/parent call the booking debit "tuition_payment"; the ledger stores it as EscrowIn.

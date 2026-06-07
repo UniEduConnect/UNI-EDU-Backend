@@ -80,6 +80,47 @@ public class WalletController(IWalletService walletService) : ControllerBase
         return NoContent();
     }
 
+    // DEV/DEMO ONLY: mocks the deposit flow while Momo/VNPay sandbox config is unavailable.
+    // Creates a Pending WalletTransaction with Method = "test". No gateway call, no payUrl.
+    [HttpPost("deposit-test")]
+    [Authorize]
+    public async Task<IActionResult> DepositTest([FromBody] DepositTestRequest request, CancellationToken cancellationToken)
+    {
+        var (userId, _) = ReadCallerOrThrow();
+
+        DepositResponse result = await _walletService.InitiateTestDepositAsync(request, userId, cancellationToken);
+
+        ApiResponse<DepositResponse> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status201Created,
+            Message = "Test deposit created. Call /deposit-test/{transactionId}/confirm to credit the wallet.",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status201Created, apiResponse);
+    }
+
+    // DEV/DEMO ONLY: replaces the real IPN step. User clicks "I confirmed the transfer" in the
+    // UI and the wallet gets credited. Refuses to settle anything that isn't Method = "test"
+    // — real Momo/VNPay pending rows still require their signed IPN.
+    [HttpPost("deposit-test/{transactionId:guid}/confirm")]
+    [Authorize]
+    public async Task<IActionResult> ConfirmDepositTest(Guid transactionId, CancellationToken cancellationToken)
+    {
+        var (userId, _) = ReadCallerOrThrow();
+
+        TestDepositConfirmResponse result = await _walletService.ConfirmTestDepositAsync(transactionId, userId, cancellationToken);
+
+        ApiResponse<TestDepositConfirmResponse> apiResponse = new()
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Test deposit confirmed. Wallet credited.",
+            Data = result
+        };
+
+        return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
+
     [HttpPost("withdraw")]
     [Authorize(Roles = "Tutor")]
     public async Task<IActionResult> Withdraw([FromBody] CreateWithdrawalRequest request, CancellationToken cancellationToken)
