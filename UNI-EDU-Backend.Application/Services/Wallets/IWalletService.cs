@@ -23,4 +23,14 @@ public interface IWalletService
     // Tutors only: creates a Pending withdrawal request and locks the requested amount by
     // debiting wallet.Balance. Finance approves/rejects via the (future) P3 endpoints.
     Task<WithdrawalResponse> CreateWithdrawalAsync(CreateWithdrawalRequest request, Guid callerUserId, CancellationToken cancellationToken);
+
+    // Mock-deposit flow used while Momo/VNPay sandbox config is unavailable. NO gateway call,
+    // NO signature, NO IPN — purely DB-side bookkeeping for the dev/demo path.
+    //   - InitiateTestDepositAsync: creates a Pending WalletTransaction with Method = "test".
+    //     Returns the same DepositResponse shape as the real flow (PayUrl is empty).
+    //   - ConfirmTestDepositAsync: settles that pending row (only if owned by caller, still
+    //     pending, and Method = "test") and credits the wallet. Replaces the IPN step that
+    //     would otherwise come from Momo/VNPay.
+    Task<DepositResponse> InitiateTestDepositAsync(DepositTestRequest request, Guid callerUserId, CancellationToken cancellationToken);
+    Task<TestDepositConfirmResponse> ConfirmTestDepositAsync(Guid transactionId, Guid callerUserId, CancellationToken cancellationToken);
 }
