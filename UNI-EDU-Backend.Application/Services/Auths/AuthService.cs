@@ -171,6 +171,10 @@ namespace UNI_EDU_Backend.Application.Services.Auths
                 new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role.ToString()),
+                // Custom claim so clients can display the user's name without an
+                // extra profile call. A bespoke name avoids the JwtSecurityTokenHandler
+                // outbound claim-type remapping that applies to ClaimTypes.Name.
+                new Claim("fullname", user.Fullname ?? string.Empty),
                 new Claim(JwtRegisteredClaimNames.Jti, jwtId)
             };
             var tokenDescriptor = new SecurityTokenDescriptor

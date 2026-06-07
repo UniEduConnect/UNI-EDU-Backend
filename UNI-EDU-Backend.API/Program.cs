@@ -194,7 +194,7 @@ app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
 app.UseCors("AllowFrontend");
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
