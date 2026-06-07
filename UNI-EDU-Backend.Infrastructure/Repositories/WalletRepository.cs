@@ -1,0 +1,144 @@
+using Microsoft.EntityFrameworkCore;
+using UNI_EDU_Backend.Application.DTOs.Wallets;
+using UNI_EDU_Backend.Application.Interfaces.Repositories;
+using UNI_EDU_Backend.Domain.Enums;
+using UNI_EDU_Backend.Domain.Models;
+
+namespace UNI_EDU_Backend.Infrastructure.Repositories;
+
+public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepository
+{
+    private readonly ApplicationDbContext _dbContext = dbContext;
+
+    public Task<decimal> GetBalanceAsync(Guid userId, CancellationToken cancellationToken) =>
+        _dbContext.Wallets
+            .AsNoTracking()
+            .Where(w => w.UserID == userId)
+            .Select(w => w.Balance)
+            .FirstOrDefaultAsync(cancellationToken); // default 0 when no wallet row exists
+
+    public async Task<decimal> GetTutorOutstandingEscrowAsync(Guid tutorId, CancellationToken cancellationToken) =>
+        await _dbContext.Classes
+            .AsNoTracking()
+            .Where(c => c.TutorID == tutorId)
+            // Cast to decimal? so an empty set sums to NULL → 0 instead of throwing.
+            .SumAsync(c => (decimal?)(c.EscrowAmount - c.EscrowReleased), cancellationToken) ?? 0m;
+
+    public async Task<(List<WalletTransactionRow> Items, int Total)> GetTransactionsAsync(
+        Guid userId, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var query = _dbContext.WalletTransactions
+            .AsNoTracking()
+            .Where(t => t.UserID == userId);
+
+        var total = await query.CountAsync(cancellationToken);
+        var skip = (page - 1) * pageSize;
+
+        var items = await query
+            .OrderByDescending(t => t.CreatedAt)
+            .ThenByDescending(t => t.TransactionID)
+            .Skip(skip)
+            .Take(pageSize)
+            .Select(t => new WalletTransactionRow(
+                t.TransactionID,
+                t.Type,
+                t.Amount,
+                t.Description,
+                t.CreatedAt,
+                t.RelatedClassID,
+                // LEFT JOIN to the related class for the parent-view childId.
+                t.Class != null ? t.Class.StudentID : null))
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
+
+    public async Task<Guid> CreatePendingDepositAsync(
+        Guid userId, decimal amount, string method, string orderId, string description, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+
+        // WalletTransaction.UserID has an FK to Wallet — ensure the wallet row exists (balance 0).
+        var wallet = await _dbContext.Wallets.FirstOrDefaultAsync(w => w.UserID == userId, cancellationToken);
+        if (wallet is null)
+        {
+            wallet = new Wallet { UserID = userId, Balance = 0m, EscrowBalance = 0m, UpdatedAt = now };
+            _dbContext.Wallets.Add(wallet);
+        }
+
+        var tx = new WalletTransaction
+        {
+            TransactionID = Guid.NewGuid(),
+            UserID = userId,
+            Type = WalletTxType.Deposit,
+            Status = WalletTxStatus.Pending,
+            Amount = amount,
+            Method = method,
+            ProviderRef = orderId,
+            Description = description,
+            CreatedAt = now
+        };
+        _dbContext.WalletTransactions.Add(tx);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return tx.TransactionID;
+    }
+
+    public Task<TestDepositLookup?> LookupTestDepositAsync(Guid transactionId, CancellationToken cancellationToken) =>
+        _dbContext.WalletTransactions
+            .AsNoTracking()
+            .Where(t => t.TransactionID == transactionId && t.Type == WalletTxType.Deposit)
+            .Select(t => new TestDepositLookup(t.UserID, t.ProviderRef ?? string.Empty, t.Method, t.Status, t.Amount))
+            .Cast<TestDepositLookup?>()
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<DepositSettleOutcome> SettleDepositAsync(
+        string orderId, bool success, string providerTxnId, decimal confirmedAmount, CancellationToken cancellationToken)
+    {
+        await using var dbTx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var tx = await _dbContext.WalletTransactions
+            .FirstOrDefaultAsync(t => t.ProviderRef == orderId && t.Type == WalletTxType.Deposit, cancellationToken);
+
+        if (tx is null)
+            return DepositSettleOutcome.NotFound;
+
+        // Idempotency: only a still-Pending deposit may transition. Retries are no-ops.
+        if (tx.Status != WalletTxStatus.Pending)
+            return DepositSettleOutcome.AlreadySettled;
+
+        tx.ProviderTxnId = providerTxnId;
+
+        if (!success)
+        {
+            tx.Status = WalletTxStatus.Failed;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbTx.CommitAsync(cancellationToken);
+            return DepositSettleOutcome.Failed;
+        }
+
+        // Trust the provider's confirmed amount — never credit if it disagrees with what we recorded.
+        if (tx.Amount != confirmedAmount)
+        {
+            tx.Status = WalletTxStatus.Failed;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbTx.CommitAsync(cancellationToken);
+            return DepositSettleOutcome.AmountMismatch;
+        }
+
+        var wallet = await _dbContext.Wallets.FirstOrDefaultAsync(w => w.UserID == tx.UserID, cancellationToken);
+        if (wallet is null)
+        {
+            wallet = new Wallet { UserID = tx.UserID, Balance = 0m, EscrowBalance = 0m, UpdatedAt = DateTime.UtcNow };
+            _dbContext.Wallets.Add(wallet);
+        }
+
+        wallet.Balance += confirmedAmount;
+        wallet.UpdatedAt = DateTime.UtcNow;
+        tx.Status = WalletTxStatus.Completed;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await dbTx.CommitAsync(cancellationToken);
+        return DepositSettleOutcome.Credited;
+    }
+}

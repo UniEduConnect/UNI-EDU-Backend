@@ -112,6 +112,7 @@ public class GlobalExceptionHandlerMiddleware(RequestDelegate next, ILogger<Glob
             BadRequestException => StatusCodes.Status400BadRequest,
             UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
             ForbiddenAccessException => StatusCodes.Status403Forbidden,
+            ValidationException => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
     }

@@ -15,6 +15,25 @@ services:
     networks:
       uni-edu-net:
 
+  api:
+    build: .
+    container_name: uni-edu-api
+    depends_on:
+      - postgres
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: postgres        # tên service, không phải localhost
+      POSTGRES_PORT: 5432
+      PGTZ: ${PGTZ}
+      JWT_SecretKey: ${JWT_SecretKey} # override qua env var
+    ports:
+      - "8080:8080"
+    networks:
+      uni-edu-net:
+
 networks:
   uni-edu-net:
     driver: bridge
