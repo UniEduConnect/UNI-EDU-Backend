@@ -84,6 +84,14 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
         return tx.TransactionID;
     }
 
+    public Task<TestDepositLookup?> LookupTestDepositAsync(Guid transactionId, CancellationToken cancellationToken) =>
+        _dbContext.WalletTransactions
+            .AsNoTracking()
+            .Where(t => t.TransactionID == transactionId && t.Type == WalletTxType.Deposit)
+            .Select(t => new TestDepositLookup(t.UserID, t.ProviderRef ?? string.Empty, t.Method, t.Status, t.Amount))
+            .Cast<TestDepositLookup?>()
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<DepositSettleOutcome> SettleDepositAsync(
         string orderId, bool success, string providerTxnId, decimal confirmedAmount, CancellationToken cancellationToken)
     {

@@ -26,5 +26,10 @@ namespace UNI_EDU_Backend.Application.Interfaces.Repositories
         // all inside one DB transaction. Safe to call repeatedly (webhook retries).
         Task<DepositSettleOutcome> SettleDepositAsync(
             string orderId, bool success, string providerTxnId, decimal confirmedAmount, CancellationToken cancellationToken);
+
+        // Tiny lookup used by the mock-confirm flow (POST /wallet/deposit-test/{id}/confirm).
+        // Returns null if the transaction id doesn't exist. The service uses this to enforce
+        // ownership + "must still be pending" + "must be a test row" before calling SettleDepositAsync.
+        Task<TestDepositLookup?> LookupTestDepositAsync(Guid transactionId, CancellationToken cancellationToken);
     }
 }
