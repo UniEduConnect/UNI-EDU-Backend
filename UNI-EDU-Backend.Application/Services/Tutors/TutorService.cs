@@ -10,7 +10,8 @@ public class TutorService(
     ITutorRepository tutorRepo,
     IValidator<TutorSearchQuery> searchValidator,
     IValidator<TutorReviewsQuery> reviewsValidator,
-    IValidator<SaveBankAccountRequest> saveBankValidator) : ITutorService
+    IValidator<SaveBankAccountRequest> saveBankValidator,
+    IValidator<UpdateAvailabilityRequest> availabilityValidator) : ITutorService
 {
     private const int PageSize = 10;
     private const int RecentReviewCount = 10;
@@ -19,6 +20,7 @@ public class TutorService(
     private readonly IValidator<TutorSearchQuery> _searchValidator = searchValidator;
     private readonly IValidator<TutorReviewsQuery> _reviewsValidator = reviewsValidator;
     private readonly IValidator<SaveBankAccountRequest> _saveBankValidator = saveBankValidator;
+    private readonly IValidator<UpdateAvailabilityRequest> _availabilityValidator = availabilityValidator;
 
     public async Task<PagedResult<TutorListingResponse>> SearchTutorsAsync(TutorSearchQuery query, CancellationToken cancellationToken)
     {
@@ -85,5 +87,25 @@ public class TutorService(
         var deleted = await _tutorRepo.DeleteBankAccountAsync(tutorId, cancellationToken);
         if (!deleted)
             throw new NotFoundException($"Tutor with id '{tutorId}' not found.");
+    }
+
+    public async Task<List<AvailableSlotDto>> GetTutorAvailabilityAsync(Guid tutorId, CancellationToken cancellationToken) =>
+        await _tutorRepo.GetAvailabilityAsync(tutorId, cancellationToken)
+            ?? throw new NotFoundException($"Tutor with id '{tutorId}' not found.");
+
+    public async Task<List<AvailableSlotDto>> UpdateMyAvailabilityAsync(Guid tutorId, UpdateAvailabilityRequest request, CancellationToken cancellationToken)
+    {
+        await _availabilityValidator.EnsureValidAsync(request, cancellationToken);
+
+        var slots = request.Slots
+            .Select(s => new Domain.Models.AvailableSlot { Day = s.Day.Trim(), Time = s.Time.Trim() })
+            .ToList();
+
+        if (!await _tutorRepo.SaveAvailabilityAsync(tutorId, slots, cancellationToken))
+            throw new NotFoundException($"Tutor with id '{tutorId}' not found.");
+
+        return request.Slots
+            .Select(s => new AvailableSlotDto { Day = s.Day.Trim(), Time = s.Time.Trim() })
+            .ToList();
     }
 }

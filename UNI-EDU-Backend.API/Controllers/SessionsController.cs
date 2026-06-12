@@ -33,6 +33,23 @@ public class SessionsController(ISessionService sessionService) : ControllerBase
         return StatusCode(StatusCodes.Status200OK, apiResponse);
     }
 
+    // Tutor adds a teaching session to a class's schedule.
+    [HttpPost("/api/classes/{classId:guid}/sessions")]
+    [Authorize(Roles = "Tutor,Admin")]
+    public async Task<IActionResult> Create(Guid classId, [FromBody] CreateSessionRequest request, CancellationToken cancellationToken)
+    {
+        var (userId, role) = ReadCallerOrThrow();
+
+        SessionResponse result = await _sessionService.CreateAsync(classId, request, userId, role, cancellationToken);
+
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<SessionResponse>
+        {
+            StatusCode = StatusCodes.Status201Created,
+            Message = "Đã thêm buổi dạy",
+            Data = result
+        });
+    }
+
     [HttpPatch("{id:guid}/start")]
     [Authorize]
     public async Task<IActionResult> Start(Guid id, CancellationToken cancellationToken)
@@ -81,6 +98,22 @@ public class SessionsController(ISessionService sessionService) : ControllerBase
         });
     }
 
+    [HttpPatch("{id:guid}/complete")]
+    [Authorize(Roles = "Tutor,Admin")]
+    public async Task<IActionResult> Complete(Guid id, CancellationToken cancellationToken)
+    {
+        var (userId, role) = ReadCallerOrThrow();
+
+        SessionResponse result = await _sessionService.CompleteAsync(id, userId, role, cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<SessionResponse>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Đã hoàn thành buổi học",
+            Data = result
+        });
+    }
+
     [HttpPatch("{id:guid}/rate")]
     [Authorize]
     public async Task<IActionResult> Rate(Guid id, [FromBody] RateSessionRequest request, CancellationToken cancellationToken)
@@ -125,6 +158,22 @@ public class SessionsController(ISessionService sessionService) : ControllerBase
         {
             StatusCode = StatusCodes.Status200OK,
             Message = "Absence approved, session cancelled",
+            Data = result
+        });
+    }
+
+    [HttpPatch("{id:guid}/absence/reject")]
+    [Authorize]
+    public async Task<IActionResult> RejectAbsence(Guid id, CancellationToken cancellationToken)
+    {
+        var (userId, role) = ReadCallerOrThrow();
+
+        SessionResponse result = await _sessionService.RejectAbsenceAsync(id, userId, role, cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<SessionResponse>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Absence declined, session kept",
             Data = result
         });
     }

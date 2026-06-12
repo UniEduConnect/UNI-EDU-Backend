@@ -20,6 +20,11 @@ namespace UNI_EDU_Backend.Domain.Models
         public string OptionC { get; set; }
         public string OptionD { get; set; }
         public string CorrectAnswer { get; set; }
+
+        // Optional curriculum metadata surfaced in the exam-manager question bank.
+        public string? Topic { get; set; }
+        public string? Standard { get; set; }
+
         public DateTime CreatedAt { get; set; }
 
         public virtual Subject Subject { get; set; }

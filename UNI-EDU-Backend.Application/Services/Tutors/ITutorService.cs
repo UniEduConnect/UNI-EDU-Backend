@@ -16,4 +16,9 @@ public interface ITutorService
     public Task<BankAccountResponse?> GetMyBankAccountAsync(Guid tutorId, CancellationToken cancellationToken);
     public Task<BankAccountResponse> SaveMyBankAccountAsync(Guid tutorId, SaveBankAccountRequest request, CancellationToken cancellationToken);
     public Task DeleteMyBankAccountAsync(Guid tutorId, CancellationToken cancellationToken);
+
+    // Availability. Get is public (throws NotFound if the tutor doesn't exist);
+    // Update is tutor-only (enforced at controller via [Authorize(Roles = "Tutor")]).
+    public Task<List<AvailableSlotDto>> GetTutorAvailabilityAsync(Guid tutorId, CancellationToken cancellationToken);
+    public Task<List<AvailableSlotDto>> UpdateMyAvailabilityAsync(Guid tutorId, UpdateAvailabilityRequest request, CancellationToken cancellationToken);
 }

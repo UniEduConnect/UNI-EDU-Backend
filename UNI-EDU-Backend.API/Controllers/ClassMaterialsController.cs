@@ -1,17 +1,18 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using UNI_EDU_Backend.API.Commons;
 using UNI_EDU_Backend.Application.DTOs.Classes;
-using UNI_EDU_Backend.Application.Services.ClassMaterials;
+using UNI_EDU_Backend.Application.Services.Materials;
 using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
 
 namespace UNI_EDU_Backend.API.Controllers;
 
 [ApiController]
-public class ClassMaterialsController(IClassMaterialService materialService) : ControllerBase
+[Authorize]
+public class ClassMaterialsController(IMaterialService materialService) : ControllerBase
 {
-    private readonly IClassMaterialService _materialService = materialService;
+    private readonly IMaterialService _materialService = materialService;
 
     [HttpGet("/api/classes/{classId:guid}/materials")]
     [Authorize]
@@ -19,7 +20,7 @@ public class ClassMaterialsController(IClassMaterialService materialService) : C
     {
         var (userId, role) = ReadCallerOrThrow();
 
-        List<MaterialResponse> result = await _materialService.GetMaterialsAsync(classId, userId, role, cancellationToken);
+        List<MaterialResponse> result = await _materialService.GetClassMaterialsAsync(classId, userId, role, cancellationToken);
 
         return StatusCode(StatusCodes.Status200OK, new ApiResponse<List<MaterialResponse>>
         {
@@ -30,8 +31,7 @@ public class ClassMaterialsController(IClassMaterialService materialService) : C
     }
 
     [HttpPost("/api/classes/{classId:guid}/materials")]
-    [Authorize(Roles = "Tutor")]
-    public async Task<IActionResult> Create(Guid classId, [FromBody] CreateMaterialRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Add(Guid classId, [FromBody] CreateMaterialRequest request, CancellationToken cancellationToken)
     {
         var (userId, role) = ReadCallerOrThrow();
 
@@ -46,7 +46,6 @@ public class ClassMaterialsController(IClassMaterialService materialService) : C
     }
 
     [HttpDelete("/api/classes/{classId:guid}/materials/{materialId:guid}")]
-    [Authorize(Roles = "Tutor")]
     public async Task<IActionResult> Delete(Guid classId, Guid materialId, CancellationToken cancellationToken)
     {
         var (userId, role) = ReadCallerOrThrow();

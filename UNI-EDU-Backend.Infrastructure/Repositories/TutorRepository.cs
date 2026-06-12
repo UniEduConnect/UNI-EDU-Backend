@@ -138,6 +138,7 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
                 t.AvailableSlots,
 
                 Achievements = t.Achievements ?? new List<string>(),
+                Certificates = t.Certificates ?? new List<string>(),
                 Email = t.User != null ? (t.User.Email ?? string.Empty) : string.Empty,
                 Phone = t.User != null ? (t.User.PhoneNumber ?? string.Empty) : string.Empty,
                 JoinDate = t.User != null ? t.User.CreatedAt : DateTime.UtcNow,
@@ -194,7 +195,10 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
             Location = raw.Location,
             TeachingStyle = raw.TeachingStyle,
             Achievements = raw.Achievements,
+            Certificates = raw.Certificates,
             Role = raw.TutorType == TutorType.Teacher ? "teacher" : "tutor",
+            Type = raw.TutorType == TutorType.Teacher ? "teacher" : "tutor",
+            IsVerified = raw.IsVerified,
             YearsExperience = raw.YearsExperience,
             CurrentSchool = null,
             PlatformFeeRate = 0m,
@@ -300,5 +304,27 @@ public class TutorRepository : GenericRepository<Tutor>, ITutorRepository
             .ToListAsync(cancellationToken);
 
         return (items, total);
+    }
+
+    public async Task<List<AvailableSlotDto>?> GetAvailabilityAsync(Guid tutorId, CancellationToken cancellationToken)
+    {
+        var row = await _dbContext.Tutors
+            .AsNoTracking()
+            .Where(t => t.TutorID == tutorId)
+            .Select(t => new { t.AvailableSlots })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return row is null ? null : MapSlots(row.AvailableSlots);
+    }
+
+    public async Task<bool> SaveAvailabilityAsync(Guid tutorId, List<AvailableSlot> slots, CancellationToken cancellationToken)
+    {
+        var tutor = await _dbContext.Tutors.FirstOrDefaultAsync(t => t.TutorID == tutorId, cancellationToken);
+        if (tutor is null) return false;
+
+        tutor.AvailableSlots = slots;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }

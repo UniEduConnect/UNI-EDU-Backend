@@ -5,6 +5,10 @@
         Admin,
         Tutor,
         Parent,
-        Student
+        Student,
+        // Staff portals (added). Stored as ints 4/5/6 — additive, existing data unaffected.
+        Office,
+        Finance,
+        ExamManager
     }
 }

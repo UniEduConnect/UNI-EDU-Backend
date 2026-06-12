@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -22,7 +23,7 @@ public class VnPayGateway(IOptions<VnPayOptions> options, IHttpContextAccessor h
         EnsureConfigured();
 
         var nowVn = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTime);
-        var ipAddr = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+        var ipAddr = ResolveIpv4(_httpContext.HttpContext?.Connection?.RemoteIpAddress);
 
         // VNPay sends amount in subunits (×100) — whole VND × 100.
         var amountSubunits = (long)command.Amount * 100;
@@ -51,6 +52,10 @@ public class VnPayGateway(IOptions<VnPayOptions> options, IHttpContextAccessor h
         return Task.FromResult(new PaymentCreationResult(payUrl));
     }
 
+    // IMPORTANT: vnpFields must carry the values EXACTLY as they appear in the URL (still
+    // URL-encoded). VNPay signs the encoded query string; ASP.NET's Request.Query decodes
+    // values AND does not turn '+' back into a space, so re-encoding here would corrupt any
+    // field containing spaces (e.g. vnp_OrderInfo). Hash the raw encoded values as-is.
     public bool VerifyCallbackSignature(IReadOnlyDictionary<string, string> vnpFields, string providedHash)
     {
         var sorted = new SortedDictionary<string, string>(StringComparer.Ordinal);
@@ -61,7 +66,8 @@ public class VnPayGateway(IOptions<VnPayOptions> options, IHttpContextAccessor h
             sorted[kv.Key] = kv.Value ?? string.Empty;
         }
 
-        var signData = BuildEncodedQueryString(sorted);
+        // Values are already URL-encoded → join key=value directly (no re-encoding).
+        var signData = string.Join("&", sorted.Select(kv => $"{kv.Key}={kv.Value}"));
         var expected = HmacSha512Hex(signData, _options.HashSecret);
 
         return CryptographicOperations.FixedTimeEquals(
@@ -83,6 +89,16 @@ public class VnPayGateway(IOptions<VnPayOptions> options, IHttpContextAccessor h
             first = false;
         }
         return sb.ToString();
+    }
+
+    // VNPay expects an IPv4 vnp_IpAddr. Map loopback/IPv6 (e.g. "::1", "::ffff:127.0.0.1") to IPv4.
+    private static string ResolveIpv4(System.Net.IPAddress? ip)
+    {
+        if (ip is null) return "127.0.0.1";
+        if (System.Net.IPAddress.IsLoopback(ip)) return "127.0.0.1";
+        if (ip.IsIPv4MappedToIPv6) return ip.MapToIPv4().ToString();
+        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) return ip.ToString();
+        return "127.0.0.1";
     }
 
     private static string HmacSha512Hex(string data, string key)

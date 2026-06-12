@@ -4,7 +4,7 @@ namespace UNI_EDU_Backend.Application.DTOs.Wallets;
 
 public class DepositRequestValidator : AbstractValidator<DepositRequest>
 {
-    private static readonly string[] AllowedMethods = ["momo", "vnpay", "bank"];
+    private static readonly string[] AllowedMethods = ["momo", "vnpay", "bank", "payos"];
 
     // Momo sandbox accepts 1,000 .. 50,000,000 VND. Keep a sensible floor.
     private const decimal MinAmount = 10_000m;
