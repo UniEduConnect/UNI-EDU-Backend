@@ -38,6 +38,10 @@ namespace UNI_EDU_Backend.Domain.Models
         public string? AbsenceRequestedBy { get; set; }
         public bool? AbsenceApproved { get; set; }
 
+        // Office portal acknowledgement of attendance. Independent of the escrow-releasing
+        // student/parent confirm flow.
+        public bool OfficeConfirmed { get; set; }
+
         public virtual Class Class { get; set; }
     }
 }

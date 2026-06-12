@@ -1,30 +1,48 @@
 using DotNetEnv;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Text;
-using UNI_EDU_Backend.API.Middleware;
-using UNI_EDU_Backend.Application.Mappings;
 using UNI_EDU_Backend.API.Json;
+using UNI_EDU_Backend.API.Middleware;
 using UNI_EDU_Backend.API.Realtime;
+using UNI_EDU_Backend.Application.Exceptions;
+using UNI_EDU_Backend.Application.Interfaces;
+using UNI_EDU_Backend.Application.Interfaces.Repositories;
+using UNI_EDU_Backend.Application.Mappings;
+using UNI_EDU_Backend.Application.Services.Admin;
+using UNI_EDU_Backend.Application.Services.AiTests;
+using UNI_EDU_Backend.Application.Services.Auths;
+using UNI_EDU_Backend.Application.Services.Chat;
 using UNI_EDU_Backend.Application.Services.Classes;
 using UNI_EDU_Backend.Application.Services.ClassMaterials;
-using UNI_EDU_Backend.Application.Services.Chats;
-using UNI_EDU_Backend.Application.Services.Sessions;
+using UNI_EDU_Backend.Application.Services.ClassRequests;
+using UNI_EDU_Backend.Application.Services.Dashboards;
+using UNI_EDU_Backend.Application.Services.Exams;
+using UNI_EDU_Backend.Application.Services.Finance;
+using UNI_EDU_Backend.Application.Services.Materials;
+using UNI_EDU_Backend.Application.Services.Notifications;
+using UNI_EDU_Backend.Application.Services.Office;
+using UNI_EDU_Backend.Application.Services.Otp;
 using UNI_EDU_Backend.Application.Services.Parents;
+using UNI_EDU_Backend.Application.Services.Profile;
+using UNI_EDU_Backend.Application.Services.Questions;
+using UNI_EDU_Backend.Application.Services.Refunds;
+using UNI_EDU_Backend.Application.Services.Reports;
+using UNI_EDU_Backend.Application.Services.Reviews;
+using UNI_EDU_Backend.Application.Services.Sessions;
+using UNI_EDU_Backend.Application.Services.Subjects;
 using UNI_EDU_Backend.Application.Services.Trials;
+using UNI_EDU_Backend.Application.Services.TutorPosts;
 using UNI_EDU_Backend.Application.Services.Tutors;
 using UNI_EDU_Backend.Application.Services.Users;
 using UNI_EDU_Backend.Application.Services.Wallets;
 using UNI_EDU_Backend.Infrastructure;
+using UNI_EDU_Backend.Infrastructure.Email;
 using UNI_EDU_Backend.Infrastructure.Payments;
 using UNI_EDU_Backend.Infrastructure.Repositories;
-using UNI_EDU_Backend.Application.Interfaces.Repositories;
-using UNI_EDU_Backend.Application.Services.Auths;
-using UNI_EDU_Backend.Application.Interfaces;
-using UNI_EDU_Backend.Application.Exceptions;
 using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -50,13 +68,33 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IClassRepository, ClassRepository>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+builder.Services.AddScoped<IChildProgressRepository, ChildProgressRepository>();
+builder.Services.AddScoped<IEmailOtpRepository, EmailOtpRepository>();
+builder.Services.AddScoped<IStatsRepository, StatsRepository>();
 builder.Services.AddScoped<IClassMaterialRepository, ClassMaterialRepository>();
 builder.Services.AddScoped<IChatRepository, ChatRepository>();
 builder.Services.AddScoped<IWalletRepository, WalletRepository>();
 builder.Services.AddScoped<IWithdrawalRepository, WithdrawalRepository>();
+builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
+builder.Services.AddScoped<IExamRepository, ExamRepository>();
+builder.Services.AddScoped<IMaterialRepository, MaterialRepository>();
+builder.Services.AddScoped<IAdminRepository, AdminRepository>();
+builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+builder.Services.AddScoped<IOfficeRepository, OfficeRepository>();
+builder.Services.AddScoped<IProfileRepository, ProfileRepository>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<IParentChildLinkRepository, ParentChildLinkRepository>();
+builder.Services.AddScoped<IClassRequestRepository, ClassRequestRepository>();
+builder.Services.AddScoped<ITutorPostRepository, TutorPostRepository>();
+builder.Services.AddScoped<IAiTestRepository, AiTestRepository>();
+builder.Services.AddScoped<ITrialRepository, TrialRepository>();
+builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
+builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
+builder.Services.AddScoped<IRefundRepository, RefundRepository>();
+builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IParentRepository, ParentRepository>();
-builder.Services.AddScoped<ITrialRepository, TrialRepository>();
 
 //Services
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -68,8 +106,34 @@ builder.Services.AddScoped<IClassMaterialService, ClassMaterialService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IChatNotifier, ChatNotifier>();
 builder.Services.AddScoped<IParentService, ParentService>();
+builder.Services.AddScoped<IParentChildLinkService, ParentChildLinkService>();
+builder.Services.AddScoped<IClassRequestService, ClassRequestService>();
+builder.Services.AddScoped<ITutorPostService, TutorPostService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<UNI_EDU_Backend.Application.Interfaces.IAiQuestionGenerator, UNI_EDU_Backend.Infrastructure.Ai.OpenAiQuestionGenerator>();
+builder.Services.AddScoped<UNI_EDU_Backend.Application.Interfaces.IAiCompletionService, UNI_EDU_Backend.Infrastructure.Ai.OpenAiCompletionService>();
+builder.Services.AddScoped<IAiTestService, AiTestService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
+builder.Services.AddScoped<ISubjectService, SubjectService>();
+builder.Services.AddScoped<IQuestionService, QuestionService>();
+builder.Services.AddScoped<IExamService, ExamService>();
+builder.Services.AddScoped<IAiExamGenerationService, AiExamGenerationService>();
+
+// Email + OTP (registration email verification). SMTP settings bound from the "Smtp" config section.
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddScoped<UNI_EDU_Backend.Application.Interfaces.IEmailSender, SmtpEmailSender>();
+builder.Services.AddScoped<IEmailOtpService, EmailOtpService>();
+builder.Services.AddScoped<IMaterialService, MaterialService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IFinanceService, FinanceService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<IOfficeService, OfficeService>();
+builder.Services.AddScoped<IProfileService, ProfileService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITrialService, TrialService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IRefundService, RefundService>();
+builder.Services.AddScoped<IReportService, ReportService>();
 
 // Payment gateways (Momo + VNPay). Both register as IPaymentGateway so the deposit service
 // resolves the right one by Method. Settings bound from "Momo" / "VnPay" config sections.
@@ -82,6 +146,11 @@ builder.Services.Configure<VnPayOptions>(builder.Configuration.GetSection("VnPay
 builder.Services.AddScoped<VnPayGateway>();
 builder.Services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<VnPayGateway>());
 builder.Services.AddScoped<IVnPayGateway>(sp => sp.GetRequiredService<VnPayGateway>());
+
+builder.Services.Configure<PayOsOptions>(builder.Configuration.GetSection("PayOs"));
+builder.Services.AddHttpClient<PayOsGateway>();
+builder.Services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<PayOsGateway>());
+builder.Services.AddScoped<IPayOsGateway>(sp => sp.GetRequiredService<PayOsGateway>());
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
@@ -110,6 +179,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    // Two DTOs share the simple name SendMessageRequest (namespaces .DTOs.Chat and .DTOs.Chats),
+    // which collides on the default short schemaId. Disambiguate by full type name.
+    options.CustomSchemaIds(type => type.FullName?.Replace("+", "."));
+
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -130,8 +203,10 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 
+// Override per-environment with ALLOWED_ORIGINS (comma-separated). The default covers
+// local dev (Vite on 8080 / CRA on 3000) plus the production domains.
 var allowedOrigins = builder.Configuration["ALLOWED_ORIGINS"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-    ?? ["http://localhost:3000", "http://localhost:8080"];
+    ?? ["http://localhost:3000", "http://localhost:8080", "https://unieducation.net", "https://www.unieducation.net"];
 
 builder.Services.AddCors(options =>
 {
@@ -144,6 +219,10 @@ builder.Services.AddCors(options =>
 
 var secretKey = builder.Configuration["Jwt:SecretKey"] ?? Env.GetString("JWT_SecretKey")
     ?? throw new InvalidOperationException("Jwt:SecretKey (or JWT_SecretKey env var) is not configured.");
+// Publish the resolved key back into configuration so everything that reads
+// IConfiguration["Jwt:SecretKey"] (e.g. AuthService.GenerateToken) gets the same
+// value — the signing and validation keys must always match.
+builder.Configuration["Jwt:SecretKey"] = secretKey;
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

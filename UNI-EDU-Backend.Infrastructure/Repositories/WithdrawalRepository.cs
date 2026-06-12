@@ -60,4 +60,148 @@ public class WithdrawalRepository(ApplicationDbContext dbContext) : IWithdrawalR
             RequestDate = withdrawal.RequestedAt
         };
     }
+
+    public async Task<(List<WithdrawalAdminResponse> Items, int Total)> GetAllAsync(WithdrawalStatus? status, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var q = _dbContext.Withdrawals.AsNoTracking();
+        if (status is not null)
+            q = q.Where(w => w.Status == status);
+
+        var total = await q.CountAsync(cancellationToken);
+
+        var rows = await q
+            .OrderByDescending(w => w.RequestedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(w => new
+            {
+                w.WithdrawalID,
+                w.TutorID,
+                TutorName = w.Tutor.FullName ?? w.Tutor.User.Fullname,
+                TutorAvatar = w.Tutor.AvatarUrl,
+                w.Amount,
+                w.Method,
+                w.BankName,
+                w.BankAccount,
+                w.Note,
+                w.Status,
+                w.RequestedAt,
+                w.ReviewedAt,
+                w.ReviewNote,
+                TotalWithdrawn = _dbContext.Withdrawals
+                    .Where(x => x.TutorID == w.TutorID && x.Status == WithdrawalStatus.Approved)
+                    .Sum(x => (decimal?)x.Amount) ?? 0m
+            })
+            .ToListAsync(cancellationToken);
+
+        var items = rows.Select(w => new WithdrawalAdminResponse
+        {
+            Id = w.WithdrawalID,
+            TutorId = w.TutorID,
+            TutorName = w.TutorName ?? string.Empty,
+            TutorAvatar = w.TutorAvatar,
+            Amount = w.Amount,
+            Method = w.Method,
+            BankName = w.BankName ?? string.Empty,
+            BankAccount = w.BankAccount ?? string.Empty,
+            Note = w.Note,
+            Status = w.Status.ToString().ToLowerInvariant(),
+            RequestDate = w.RequestedAt,
+            ReviewedAt = w.ReviewedAt,
+            ReviewNote = w.ReviewNote,
+            TotalWithdrawn = w.TotalWithdrawn
+        }).ToList();
+
+        return (items, total);
+    }
+
+    public async Task<WithdrawalReviewResult> ApproveAsync(Guid withdrawalId, Guid reviewerId, string? note, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        await using var tx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var withdrawal = await _dbContext.Withdrawals.FirstOrDefaultAsync(w => w.WithdrawalID == withdrawalId, cancellationToken);
+        if (withdrawal is null)
+            return new WithdrawalReviewResult(WithdrawalReviewOutcome.NotFound, string.Empty, 0m);
+
+        var tutorName = await TutorNameAsync(withdrawal.TutorID, cancellationToken);
+
+        if (withdrawal.Status != WithdrawalStatus.Pending)
+            return new WithdrawalReviewResult(WithdrawalReviewOutcome.AlreadyReviewed, tutorName, withdrawal.Amount);
+
+        withdrawal.Status = WithdrawalStatus.Approved;
+        withdrawal.ReviewedAt = now;
+        withdrawal.ReviewerID = reviewerId;
+        withdrawal.ReviewNote = note;
+
+        // Funds were already debited at request time — just record the payout in the ledger.
+        _dbContext.WalletTransactions.Add(new WalletTransaction
+        {
+            TransactionID = Guid.NewGuid(),
+            UserID = withdrawal.TutorID,
+            Type = WalletTxType.Withdrawal,
+            Amount = withdrawal.Amount,
+            Status = WalletTxStatus.Completed,
+            Method = withdrawal.Method,
+            Description = $"Withdrawal payout to {withdrawal.BankName} ({withdrawal.BankAccount})",
+            CreatedAt = now
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+
+        return new WithdrawalReviewResult(WithdrawalReviewOutcome.Done, tutorName, withdrawal.Amount);
+    }
+
+    public async Task<WithdrawalReviewResult> RejectAsync(Guid withdrawalId, Guid reviewerId, string? note, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        await using var tx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var withdrawal = await _dbContext.Withdrawals.FirstOrDefaultAsync(w => w.WithdrawalID == withdrawalId, cancellationToken);
+        if (withdrawal is null)
+            return new WithdrawalReviewResult(WithdrawalReviewOutcome.NotFound, string.Empty, 0m);
+
+        var tutorName = await TutorNameAsync(withdrawal.TutorID, cancellationToken);
+
+        if (withdrawal.Status != WithdrawalStatus.Pending)
+            return new WithdrawalReviewResult(WithdrawalReviewOutcome.AlreadyReviewed, tutorName, withdrawal.Amount);
+
+        withdrawal.Status = WithdrawalStatus.Rejected;
+        withdrawal.ReviewedAt = now;
+        withdrawal.ReviewerID = reviewerId;
+        withdrawal.ReviewNote = note;
+
+        // Refund the locked amount back to the tutor's spendable balance.
+        var wallet = await _dbContext.Wallets.FirstOrDefaultAsync(w => w.UserID == withdrawal.TutorID, cancellationToken);
+        if (wallet is null)
+        {
+            wallet = new Wallet { UserID = withdrawal.TutorID, Balance = 0m, EscrowBalance = 0m, UpdatedAt = now };
+            _dbContext.Wallets.Add(wallet);
+        }
+        wallet.Balance += withdrawal.Amount;
+        wallet.UpdatedAt = now;
+
+        _dbContext.WalletTransactions.Add(new WalletTransaction
+        {
+            TransactionID = Guid.NewGuid(),
+            UserID = withdrawal.TutorID,
+            Type = WalletTxType.Refund,
+            Amount = withdrawal.Amount,
+            Status = WalletTxStatus.Completed,
+            Description = "Refund for rejected withdrawal request",
+            CreatedAt = now
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+
+        return new WithdrawalReviewResult(WithdrawalReviewOutcome.Done, tutorName, withdrawal.Amount);
+    }
+
+    private Task<string> TutorNameAsync(Guid tutorId, CancellationToken cancellationToken) =>
+        _dbContext.Tutors
+            .Where(t => t.TutorID == tutorId)
+            .Select(t => t.FullName ?? t.User.Fullname)
+            .FirstOrDefaultAsync(cancellationToken)!;
 }

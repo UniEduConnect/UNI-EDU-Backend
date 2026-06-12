@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UNI_EDU_Backend.API.Commons;
 using UNI_EDU_Backend.Application.Commons;
+using UNI_EDU_Backend.Application.DTOs.Profile;
 using UNI_EDU_Backend.Application.DTOs.Tutors;
+using UNI_EDU_Backend.Application.Services.Profile;
 using UNI_EDU_Backend.Application.Services.Tutors;
 using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
 
@@ -11,9 +13,10 @@ namespace UNI_EDU_Backend.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class TutorsController(ITutorService tutorService) : ControllerBase
+public class TutorsController(ITutorService tutorService, IProfileService profileService) : ControllerBase
 {
     private readonly ITutorService _tutorService = tutorService;
+    private readonly IProfileService _profileService = profileService;
 
     [HttpGet]
     public async Task<IActionResult> Search([FromQuery] TutorSearchQuery query, CancellationToken cancellationToken)
@@ -113,6 +116,54 @@ public class TutorsController(ITutorService tutorService) : ControllerBase
         };
 
         return StatusCode(StatusCodes.Status200OK, apiResponse);
+    }
+
+    // Public — the find-tutor / booking UI reads a tutor's weekly availability.
+    [HttpGet("{id:guid}/availability")]
+    public async Task<IActionResult> GetAvailability(Guid id, CancellationToken cancellationToken)
+    {
+        List<AvailableSlotDto> result = await _tutorService.GetTutorAvailabilityAsync(id, cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<List<AvailableSlotDto>>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get tutor availability successfully",
+            Data = result
+        });
+    }
+
+    // Tutor self-edit of their rich profile (bio, rate, subjects, certificates, ...).
+    [HttpPut("me/profile")]
+    [Authorize(Roles = "Tutor")]
+    public async Task<IActionResult> UpdateMyProfile([FromBody] UpdateTutorProfileRequest request, CancellationToken cancellationToken)
+    {
+        var tutorId = ReadCallerIdOrThrow();
+
+        CurrentUserResponse result = await _profileService.UpdateMyTutorProfileAsync(tutorId, request, cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<CurrentUserResponse>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Tutor profile updated successfully",
+            Data = result
+        });
+    }
+
+    // PUT acts as a full replace of the caller's own availability slots.
+    [HttpPut("me/availability")]
+    [Authorize(Roles = "Tutor")]
+    public async Task<IActionResult> UpdateMyAvailability([FromBody] UpdateAvailabilityRequest request, CancellationToken cancellationToken)
+    {
+        var tutorId = ReadCallerIdOrThrow();
+
+        List<AvailableSlotDto> result = await _tutorService.UpdateMyAvailabilityAsync(tutorId, request, cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<List<AvailableSlotDto>>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Availability updated successfully",
+            Data = result
+        });
     }
 
     private Guid ReadCallerIdOrThrow()

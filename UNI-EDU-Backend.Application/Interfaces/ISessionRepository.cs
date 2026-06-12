@@ -28,6 +28,9 @@ public interface ISessionRepository
     // Sessions for a class, ordered chronologically. Empty list when the class has none.
     Task<List<SessionResponse>> GetByClassIdAsync(Guid classId, CancellationToken cancellationToken);
 
+    // Tutor adds a teaching session to a class (also bumps the class's planned session count).
+    Task<SessionResponse> CreateAsync(Guid classId, DateTime startAt, DateTime endAt, UNI_EDU_Backend.Domain.Enums.ClassFormat format, CancellationToken cancellationToken);
+
     // Authorization/state snapshot for one session. Null when the session does not exist.
     Task<SessionAuthContext?> GetContextAsync(Guid sessionId, CancellationToken cancellationToken);
 
@@ -45,4 +48,5 @@ public interface ISessionRepository
 
     Task<SessionResponse> RequestAbsenceAsync(Guid sessionId, CreateAbsenceRequest request, CancellationToken cancellationToken);
     Task<SessionResponse> ApproveAbsenceAsync(Guid sessionId, CancellationToken cancellationToken);
+    Task<SessionResponse> RejectAbsenceAsync(Guid sessionId, CancellationToken cancellationToken);
 }

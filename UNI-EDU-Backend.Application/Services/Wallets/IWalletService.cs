@@ -20,6 +20,12 @@ public interface IWalletService
     // never throws on bad signature so VNPay receives a structured "97 Invalid Checksum".
     Task<VnPayIpnResponse> HandleVnPayIpnAsync(IReadOnlyDictionary<string, string> vnpFields, string providedHash, CancellationToken cancellationToken);
 
+    // Confirms + settles a deposit from the signed VNPay browser-return params (idempotent).
+    Task<VnPayReturnResult> HandleVnPayReturnAsync(IReadOnlyDictionary<string, string> vnpFields, string providedHash, CancellationToken cancellationToken);
+
+    // PayOS server-to-server webhook (signature-verified). Settles the deposit by orderCode.
+    Task<DepositSettleOutcome> HandlePayOsWebhookAsync(PayOsWebhookPayload payload, CancellationToken cancellationToken);
+
     // Tutors only: creates a Pending withdrawal request and locks the requested amount by
     // debiting wallet.Balance. Finance approves/rejects via the (future) P3 endpoints.
     Task<WithdrawalResponse> CreateWithdrawalAsync(CreateWithdrawalRequest request, Guid callerUserId, CancellationToken cancellationToken);

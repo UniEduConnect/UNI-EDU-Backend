@@ -22,4 +22,9 @@ public interface ITutorRepository : IGenericRepository<Tutor>
     Task<BankAccountResponse?> GetBankAccountAsync(Guid tutorId, CancellationToken cancellationToken);
     Task<bool> SaveBankAccountAsync(Guid tutorId, SaveBankAccountRequest request, CancellationToken cancellationToken);
     Task<bool> DeleteBankAccountAsync(Guid tutorId, CancellationToken cancellationToken);
+
+    // Weekly availability slots (jsonb on Tutor). Get returns null if the tutor row is missing.
+    // Save replaces the whole set; returns false if the tutor row is missing.
+    Task<List<AvailableSlotDto>?> GetAvailabilityAsync(Guid tutorId, CancellationToken cancellationToken);
+    Task<bool> SaveAvailabilityAsync(Guid tutorId, List<AvailableSlot> slots, CancellationToken cancellationToken);
 }

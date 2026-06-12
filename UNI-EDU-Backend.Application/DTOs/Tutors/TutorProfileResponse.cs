@@ -24,7 +24,10 @@ public class TutorProfileResponse
     public string Location { get; set; } = default!;
     public string TeachingStyle { get; set; } = default!;
     public List<string> Achievements { get; set; } = new();
+    public List<string> Certificates { get; set; } = new();
     public string Role { get; set; } = default!;
+    public string Type { get; set; } = "tutor";   // "tutor" | "teacher" (from Tutor.TutorType)
+    public bool IsVerified { get; set; }
     public int? YearsExperience { get; set; }
     public string? CurrentSchool { get; set; }
     public decimal PlatformFeeRate { get; set; }
