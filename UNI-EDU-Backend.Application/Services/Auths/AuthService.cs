@@ -26,6 +26,7 @@ namespace UNI_EDU_Backend.Application.Services.Auths
         private readonly IUnitOfWork _unitOfWork;
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContext;
+        private readonly Otp.IEmailOtpService _emailOtpService;
 
         public AuthService(
             IAuthRepository authRepository,
@@ -37,7 +38,8 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             IGenericRepository<RefreshToken> genericRepository,
             IUnitOfWork unitOfWork,
             IConfiguration configuration,
-            IHttpContextAccessor httpContext)
+            IHttpContextAccessor httpContext,
+            Otp.IEmailOtpService emailOtpService)
         {
             this._authRepository = authRepository;
             this._studentRepository = studentRepository;
@@ -49,6 +51,18 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             this._unitOfWork = unitOfWork;
             this._configuration = configuration;
             this._httpContext = httpContext;
+            this._emailOtpService = emailOtpService;
+        }
+
+        // Registration requires a recently OTP-verified email. Toggle off via Otp:RequireForRegister=false.
+        private async Task EnsureEmailVerifiedForRegisterAsync(string email)
+        {
+            // Default true; disable with Otp:RequireForRegister=false.
+            if (bool.TryParse(_configuration["Otp:RequireForRegister"], out var require) && !require)
+                return;
+            var verified = await _emailOtpService.IsEmailVerifiedAsync(email, "register", CancellationToken.None);
+            if (!verified)
+                throw new Exceptions.BadRequestException("Vui lòng xác thực email bằng mã OTP trước khi đăng ký.");
         }
         public async Task<TokenResponse> LoginAsync(LoginRequest loginRequest)
         {
@@ -58,11 +72,18 @@ namespace UNI_EDU_Backend.Application.Services.Auths
                 throw new Exceptions.UnauthorizedAccessException("Invalid email or password.");
             }
 
-            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(loginRequest.Password, user.HashedPassword); 
+            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(loginRequest.Password, user.HashedPassword);
             if (!isPasswordValid)
             {
                 throw new Exceptions.UnauthorizedAccessException("Invalid email or password.");
             }
+
+            // Block suspended/rejected accounts from authenticating (Pending tutors may still log in).
+            if (user.Status == Domain.Enums.UserStatus.Suspended || user.Status == Domain.Enums.UserStatus.Rejected)
+            {
+                throw new Exceptions.ForbiddenAccessException("Tài khoản của bạn đã bị khóa hoặc từ chối. Vui lòng liên hệ hỗ trợ.");
+            }
+
             return await GenerateToken(user);
         }
 
@@ -73,6 +94,8 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             {
                 throw new Exceptions.BadRequestException("Phone number or email is already taken.");
             }
+
+            await EnsureEmailVerifiedForRegisterAsync(registerDto.Email);
 
             var userEntity = _autoMapper.Map<User>(registerDto);
             userEntity.UserID = Guid.NewGuid();
@@ -98,6 +121,8 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             {
                 throw new Exceptions.BadRequestException("Phone number or email is already taken.");
             }
+
+            await EnsureEmailVerifiedForRegisterAsync(registerDto.Email);
 
             var userEntity = _autoMapper.Map<User>(registerDto);
             userEntity.UserID = Guid.NewGuid();
@@ -125,6 +150,8 @@ namespace UNI_EDU_Backend.Application.Services.Auths
             {
                 throw new Exceptions.BadRequestException("Phone number or email is already taken.");
             }
+            await EnsureEmailVerifiedForRegisterAsync(registerDto.Email);
+
             var userEntity = _autoMapper.Map<User>(registerDto);
             userEntity.UserID = Guid.NewGuid();
             userEntity.HashedPassword = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
@@ -164,7 +191,12 @@ namespace UNI_EDU_Backend.Application.Services.Auths
         private async Task<TokenResponse> GenerateToken(User user)
         {
             var jwtTokenHandler = new JwtSecurityTokenHandler();
-            var secretKeyByte = Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"]);
+            // Source the signing key the same way Program.cs sources the validation key:
+            // appsettings (Jwt:SecretKey) first, then the JWT_SecretKey env var (.env / secret store).
+            var secretKey = _configuration["Jwt:SecretKey"]
+                ?? Environment.GetEnvironmentVariable("JWT_SecretKey")
+                ?? throw new InvalidOperationException("Jwt:SecretKey (or JWT_SecretKey env var) is not configured.");
+            var secretKeyByte = Encoding.UTF8.GetBytes(secretKey);
 
             var jwtId = Guid.NewGuid().ToString();
 

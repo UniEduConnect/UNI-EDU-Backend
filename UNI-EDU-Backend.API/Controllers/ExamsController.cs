@@ -11,9 +11,24 @@ namespace UNI_EDU_Backend.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class ExamsController(IExamService examService) : ControllerBase
+public class ExamsController(IExamService examService, IAiExamGenerationService aiExamService) : ControllerBase
 {
     private readonly IExamService _examService = examService;
+    private readonly IAiExamGenerationService _aiExamService = aiExamService;
+
+    // Generate questions with AI and persist a new exam/exercise (exam-manager or tutor).
+    [HttpPost("generate-with-ai")]
+    [Authorize(Roles = "Admin,ExamManager,Tutor")]
+    public async Task<IActionResult> GenerateWithAi([FromBody] GenerateExamWithAiRequest request, CancellationToken cancellationToken)
+    {
+        ExamDetailResponse result = await _aiExamService.GenerateAndCreateAsync(request, ReadUserIdOrThrow(), ReadRoleOrThrow(), cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<ExamDetailResponse>
+        {
+            StatusCode = StatusCodes.Status201Created,
+            Message = "Đã tạo đề bằng AI",
+            Data = result
+        });
+    }
 
     // Authenticated listing. Admin sees every exam (incl. drafts/hidden); others see open/closed only.
     [HttpGet]
@@ -48,7 +63,7 @@ public class ExamsController(IExamService examService) : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,ExamManager")]
     public async Task<IActionResult> Create([FromBody] CreateExamRequest request, CancellationToken cancellationToken)
     {
         ExamDetailResponse result = await _examService.CreateAsync(request, cancellationToken);
@@ -62,7 +77,7 @@ public class ExamsController(IExamService examService) : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,ExamManager")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateExamRequest request, CancellationToken cancellationToken)
     {
         ExamDetailResponse result = await _examService.UpdateAsync(id, request, cancellationToken);
@@ -76,7 +91,7 @@ public class ExamsController(IExamService examService) : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,ExamManager")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         await _examService.DeleteAsync(id, cancellationToken);
@@ -91,7 +106,7 @@ public class ExamsController(IExamService examService) : ControllerBase
 
     // Replace the exam's full ordered question set.
     [HttpPut("{id:int}/questions")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,ExamManager")]
     public async Task<IActionResult> SetQuestions(int id, [FromBody] SetExamQuestionsRequest request, CancellationToken cancellationToken)
     {
         ExamDetailResponse result = await _examService.SetQuestionsAsync(id, request, cancellationToken);
@@ -121,7 +136,7 @@ public class ExamsController(IExamService examService) : ControllerBase
     }
 
     [HttpGet("ai-config")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,ExamManager")]
     public async Task<IActionResult> GetAiConfig(CancellationToken cancellationToken)
     {
         ExamAiConfigResponse result = await _examService.GetAiConfigAsync(cancellationToken);
@@ -134,7 +149,7 @@ public class ExamsController(IExamService examService) : ControllerBase
     }
 
     [HttpPut("ai-config")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,ExamManager")]
     public async Task<IActionResult> UpdateAiConfig([FromBody] UpdateExamAiConfigRequest request, CancellationToken cancellationToken)
     {
         ExamAiConfigResponse result = await _examService.UpdateAiConfigAsync(request, cancellationToken);
@@ -148,7 +163,7 @@ public class ExamsController(IExamService examService) : ControllerBase
 
     // Per-exam aggregate analytics (exam-manager stats screen).
     [HttpGet("stats")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,ExamManager")]
     public async Task<IActionResult> GetStats(CancellationToken cancellationToken)
     {
         List<ExamStatItem> result = await _examService.GetStatsAsync(cancellationToken);
@@ -164,7 +179,7 @@ public class ExamsController(IExamService examService) : ControllerBase
     // All attempts for an exam (exam-manager analytics). Available as both /submissions and /attempts.
     [HttpGet("{id:int}/submissions")]
     [HttpGet("{id:int}/attempts")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,ExamManager")]
     public async Task<IActionResult> GetExamSubmissions(int id, [FromQuery] int page, CancellationToken cancellationToken)
     {
         PagedResult<SubmissionResponse> result = await _examService.GetExamSubmissionsAsync(id, page < 1 ? 1 : page, cancellationToken);

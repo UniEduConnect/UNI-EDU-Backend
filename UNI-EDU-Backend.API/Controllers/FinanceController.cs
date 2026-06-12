@@ -12,7 +12,7 @@ namespace UNI_EDU_Backend.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize(Roles = "Admin")] // Finance portal maps to the Admin role in the backend.
+[Authorize(Roles = "Admin,Finance")] // Finance portal: Admin or Finance staff.
 public class FinanceController(IFinanceService financeService) : ControllerBase
 {
     private readonly IFinanceService _financeService = financeService;

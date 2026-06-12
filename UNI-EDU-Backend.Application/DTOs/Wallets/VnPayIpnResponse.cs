@@ -14,3 +14,11 @@ public class VnPayIpnResponse
     [JsonPropertyName("Message")]
     public string Message { get; set; } = string.Empty;
 }
+
+// Result of confirming a deposit from the VNPay browser-return params (signed). Lets the wallet
+// credit even when the server-to-server IPN doesn't arrive (e.g. ngrok in dev). Idempotent.
+public class VnPayReturnResult
+{
+    public string Status { get; set; } = string.Empty; // credited | already | failed | amount-mismatch | not-found | invalid-signature | invalid
+    public decimal Amount { get; set; }
+}

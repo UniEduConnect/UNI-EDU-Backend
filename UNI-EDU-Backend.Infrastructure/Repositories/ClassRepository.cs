@@ -59,7 +59,9 @@ public class ClassRepository(ApplicationDbContext dbContext) : IClassRepository
             StudentID = request.StudentId,
             SubjectID = request.SubjectId,
             Name = string.IsNullOrWhiteSpace(request.Name) ? $"{subjectName} - Lớp mới" : request.Name,
-            StartDate = request.StartDate,
+            // StartDate comes from a JSON date ("yyyy-MM-dd") with Kind=Unspecified, which
+            // Npgsql rejects for a `timestamp with time zone` column. Normalize to UTC.
+            StartDate = DateTime.SpecifyKind(request.StartDate, DateTimeKind.Utc),
             TuitionFee = request.Fee,
             Status = ClassStatus.Searching,
             Format = format,
@@ -269,15 +271,67 @@ public class ClassRepository(ApplicationDbContext dbContext) : IClassRepository
         return (items, total);
     }
 
-    public async Task<bool> UpdatePartialAsync(Guid classId, string? name, ClassStatus? status, CancellationToken cancellationToken)
+    public async Task<bool> UpdatePartialAsync(Guid classId, UpdateClassRequest request, CancellationToken cancellationToken)
     {
         var entity = await _dbContext.Classes
             .FirstOrDefaultAsync(c => c.ClassID == classId, cancellationToken);
 
         if (entity is null) return false;
 
-        if (name is not null) entity.Name = name.Trim();
-        if (status.HasValue) entity.Status = status.Value;
+        if (request.Name is not null) entity.Name = request.Name.Trim();
+        if (request.Status is not null && Enum.TryParse<ClassStatus>(request.Status.Trim(), true, out var st))
+            entity.Status = st;
+        if (request.SubjectId is not null) entity.SubjectID = request.SubjectId.Value;
+        if (request.TutorId is not null) entity.TutorID = request.TutorId.Value;
+        if (request.StudentId is not null) entity.StudentID = request.StudentId.Value;
+        if (request.Format is not null) entity.Format = ParseFormat(request.Format);
+        if (request.TotalSessions is not null) entity.TotalSessions = request.TotalSessions.Value;
+
+        // Fee change → re-sync the student's escrow so EscrowAmount stays equal to the fee.
+        // Increase: lock the extra from the student's Balance. Decrease: refund the surplus.
+        if (request.Fee is not null && request.Fee.Value != entity.EscrowAmount)
+        {
+            var newFee = request.Fee.Value;
+            if (newFee < entity.EscrowReleased)
+                throw new BadRequestException($"Học phí mới ({newFee:N0}) không thể nhỏ hơn phần ký quỹ đã giải ngân ({entity.EscrowReleased:N0}).");
+
+            var wallet = await _dbContext.Wallets.FirstOrDefaultAsync(w => w.UserID == entity.StudentID, cancellationToken)
+                ?? throw new BadRequestException("Không tìm thấy ví của học sinh để điều chỉnh ký quỹ.");
+
+            var delta = newFee - entity.EscrowAmount; // >0 lock more, <0 release back
+            var now = DateTime.UtcNow;
+
+            if (delta > 0)
+            {
+                if (wallet.Balance < delta)
+                    throw new BadRequestException($"Số dư ví học sinh không đủ để tăng ký quỹ thêm {delta:N0}đ. Hãy nạp thêm trước.");
+                wallet.Balance -= delta;
+                wallet.EscrowBalance += delta;
+                _dbContext.WalletTransactions.Add(new WalletTransaction
+                {
+                    TransactionID = Guid.NewGuid(), UserID = entity.StudentID, Type = WalletTxType.EscrowIn,
+                    Amount = delta, RelatedClassID = entity.ClassID,
+                    Description = $"Điều chỉnh tăng ký quỹ lớp {entity.Name}", CreatedAt = now
+                });
+            }
+            else
+            {
+                var refund = -delta;
+                wallet.EscrowBalance -= refund;
+                wallet.Balance += refund;
+                _dbContext.WalletTransactions.Add(new WalletTransaction
+                {
+                    TransactionID = Guid.NewGuid(), UserID = entity.StudentID, Type = WalletTxType.Refund,
+                    Amount = refund, RelatedClassID = entity.ClassID,
+                    Description = $"Hoàn ký quỹ dư lớp {entity.Name}", CreatedAt = now
+                });
+            }
+
+            wallet.UpdatedAt = now;
+            entity.EscrowAmount = newFee;
+        }
+
+        if (request.Fee is not null) entity.TuitionFee = request.Fee.Value;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;

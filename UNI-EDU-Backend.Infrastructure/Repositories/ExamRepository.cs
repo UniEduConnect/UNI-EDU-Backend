@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Exams;
+using UNI_EDU_Backend.Application.Interfaces;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Enums;
 using UNI_EDU_Backend.Domain.Models;
@@ -112,6 +113,63 @@ public class ExamRepository(ApplicationDbContext dbContext) : IExamRepository
         }
 
         return (await GetByIdAsync(entity.ExamID, includeAnswerKey: true, cancellationToken))!;
+    }
+
+    public async Task<ExamDetailResponse> CreateAiExamAsync(
+        Guid subjectId, string title, int duration, DifficultyLevel difficulty,
+        CreatorType createdBy, Guid? creatorTutorId, string? topic,
+        IReadOnlyList<GeneratedQuestion> questions, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+
+        // Atomic: questions + exam + links commit together (or roll back) — no orphaned questions.
+        await using var dbTx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var questionEntities = questions.Select(q => new Question
+        {
+            SubjectID = subjectId,
+            Content = q.Content,
+            Type = QuestionType.MultipleChoice,
+            Difficulty = difficulty,
+            OptionA = q.Options.ElementAtOrDefault(0) ?? string.Empty,
+            OptionB = q.Options.ElementAtOrDefault(1) ?? string.Empty,
+            OptionC = q.Options.ElementAtOrDefault(2) ?? string.Empty,
+            OptionD = q.Options.ElementAtOrDefault(3) ?? string.Empty,
+            CorrectAnswer = q.CorrectIndex switch { 1 => "B", 2 => "C", 3 => "D", _ => "A" },
+            Topic = topic,
+            CreatedAt = now,
+        }).ToList();
+
+        _dbContext.Questions.AddRange(questionEntities);
+        await _dbContext.SaveChangesAsync(cancellationToken); // assigns QuestionIDs
+
+        var exam = new Exam
+        {
+            SubjectID = subjectId,
+            Title = title,
+            Description = string.Empty,
+            Duration = duration,
+            Type = ExamType.StudentTest,
+            CreatedBy = createdBy,
+            Status = ExamStatus.Draft,
+            Difficulty = difficulty,
+            Fee = 0,
+            Year = now.Year,
+            MaxAttemptsPerUser = 1,
+            ScoreScale = 10,
+            AiProctoring = false,
+            CreatorTutorID = creatorTutorId,
+            CreatedAt = now,
+        };
+        _dbContext.Exams.Add(exam);
+        await _dbContext.SaveChangesAsync(cancellationToken); // assigns ExamID
+
+        AddExamQuestions(exam.ExamID, questionEntities.Select(q => q.QuestionID).ToList());
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var result = (await GetByIdAsync(exam.ExamID, includeAnswerKey: true, cancellationToken))!;
+        await dbTx.CommitAsync(cancellationToken);
+        return result;
     }
 
     public async Task<ExamDetailResponse?> UpdateAsync(int id, UpdateExamRequest request, CancellationToken cancellationToken)

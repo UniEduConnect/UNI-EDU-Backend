@@ -9,7 +9,7 @@ namespace UNI_EDU_Backend.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize(Roles = "Admin")] // Question bank lives in the exam-manager (Admin) portal.
+[Authorize(Roles = "Admin,ExamManager")] // Question bank: Admin or ExamManager.
 public class QuestionsController(IQuestionService questionService) : ControllerBase
 {
     private readonly IQuestionService _questionService = questionService;

@@ -134,6 +134,53 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
         return DepositSettleOutcome.Credited;
     }
 
+    public async Task<bool> TransferAsync(Guid fromUserId, Guid toUserId, decimal amount, string fromDescription, string toDescription, CancellationToken cancellationToken)
+    {
+        await using var dbTx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+
+        var fromWallet = await _dbContext.Wallets.FirstOrDefaultAsync(w => w.UserID == fromUserId, cancellationToken);
+        if (fromWallet is null || fromWallet.Balance < amount)
+            return false; // no source wallet / insufficient balance
+
+        var toWallet = await _dbContext.Wallets.FirstOrDefaultAsync(w => w.UserID == toUserId, cancellationToken);
+        if (toWallet is null)
+        {
+            toWallet = new Wallet { UserID = toUserId, Balance = 0m, EscrowBalance = 0m, UpdatedAt = now };
+            _dbContext.Wallets.Add(toWallet);
+        }
+
+        fromWallet.Balance -= amount;
+        fromWallet.UpdatedAt = now;
+        toWallet.Balance += amount;
+        toWallet.UpdatedAt = now;
+
+        _dbContext.WalletTransactions.Add(new WalletTransaction
+        {
+            TransactionID = Guid.NewGuid(),
+            UserID = fromUserId,
+            Type = WalletTxType.TransferOut,
+            Status = WalletTxStatus.Completed,
+            Amount = amount,
+            Description = fromDescription,
+            CreatedAt = now
+        });
+        _dbContext.WalletTransactions.Add(new WalletTransaction
+        {
+            TransactionID = Guid.NewGuid(),
+            UserID = toUserId,
+            Type = WalletTxType.TransferIn,
+            Status = WalletTxStatus.Completed,
+            Amount = amount,
+            Description = toDescription,
+            CreatedAt = now
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await dbTx.CommitAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<(List<AdminTransactionResponse> Items, int Total)> GetAllTransactionsAsync(string? type, string? status, int page, int pageSize, CancellationToken cancellationToken)
     {
         var q = _dbContext.WalletTransactions.AsNoTracking().AsQueryable();
@@ -192,6 +239,8 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
             "withdrawal" => WalletTxType.Withdrawal,
             "refund" => WalletTxType.Refund,
             "platform_fee" => WalletTxType.PlatformFee,
+            "transfer_in" => WalletTxType.TransferIn,
+            "transfer_out" => WalletTxType.TransferOut,
             _ => null
         };
 
@@ -212,6 +261,8 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
         WalletTxType.Withdrawal => "withdrawal",
         WalletTxType.Refund => "refund",
         WalletTxType.PlatformFee => "platform_fee",
+        WalletTxType.TransferIn => "transfer_in",
+        WalletTxType.TransferOut => "transfer_out",
         _ => type.ToString().ToLowerInvariant()
     };
 

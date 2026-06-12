@@ -15,6 +15,14 @@ public interface IExamRepository
 
     Task<ExamDetailResponse> CreateAsync(CreateExamRequest request, CancellationToken cancellationToken);
 
+    // Persist an AI-generated exam: create new Question rows, the Exam, and the ExamQuestion links.
+    Task<ExamDetailResponse> CreateAiExamAsync(
+        Guid subjectId, string title, int duration,
+        UNI_EDU_Backend.Domain.Enums.DifficultyLevel difficulty,
+        UNI_EDU_Backend.Domain.Enums.CreatorType createdBy, Guid? creatorTutorId, string? topic,
+        IReadOnlyList<UNI_EDU_Backend.Application.Interfaces.GeneratedQuestion> questions,
+        CancellationToken cancellationToken);
+
     Task<ExamDetailResponse?> UpdateAsync(int id, UpdateExamRequest request, CancellationToken cancellationToken);
 
     Task<bool> DeleteAsync(int id, CancellationToken cancellationToken);

@@ -27,4 +27,8 @@ public interface IOfficeRepository
     Task<AppointmentResponse> CreateAppointmentAsync(SaveAppointmentRequest request, CancellationToken cancellationToken);
     Task<AppointmentResponse?> UpdateAppointmentAsync(Guid id, SaveAppointmentRequest request, CancellationToken cancellationToken);
     Task<bool> SetAppointmentStatusAsync(Guid id, AppointmentStatus status, CancellationToken cancellationToken);
+
+    // Room inventory + occupancy. Occupied = distinct offline/hybrid classes with an active
+    // session overlapping [windowStart, windowEnd] (real demand for a physical room).
+    Task<RoomInventoryResponse> GetRoomInventoryAsync(DateTime windowStart, DateTime windowEnd, CancellationToken cancellationToken);
 }

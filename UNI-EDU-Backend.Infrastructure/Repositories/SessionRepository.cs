@@ -215,9 +215,50 @@ public class SessionRepository(ApplicationDbContext dbContext) : ISessionReposit
         return MapToResponse(session);
     }
 
+    public async Task<SessionResponse> RejectAbsenceAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var session = await LoadTrackedAsync(sessionId, cancellationToken);
+
+        // Denied: the absence is not granted and the session stays as scheduled.
+        session.AbsenceApproved = false;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapToResponse(session);
+    }
+
     private async Task<Session> LoadTrackedAsync(Guid sessionId, CancellationToken cancellationToken) =>
         await _dbContext.Sessions.FirstOrDefaultAsync(s => s.SessionID == sessionId, cancellationToken)
             ?? throw new NotFoundException($"Session with id '{sessionId}' not found.");
+
+    public async Task<SessionResponse> CreateAsync(Guid classId, DateTime startAt, DateTime endAt, ClassFormat format, CancellationToken cancellationToken)
+    {
+        // Postgres 'timestamptz' columns require UTC-kind DateTimes; client sends local/unspecified.
+        static DateTime AsUtc(DateTime dt) => dt.Kind switch
+        {
+            DateTimeKind.Utc => dt,
+            DateTimeKind.Local => dt.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc),
+        };
+
+        var session = new Session
+        {
+            SessionID = Guid.NewGuid(),
+            ClassID = classId,
+            StartAt = AsUtc(startAt),
+            EndAt = AsUtc(endAt),
+            Status = SessionStatus.Scheduled,
+            Format = format,
+            CreatedAt = DateTime.UtcNow,
+        };
+        _dbContext.Sessions.Add(session);
+
+        // Keep the class's planned-session count in sync so progress bars stay correct.
+        var classRow = await _dbContext.Classes.FirstOrDefaultAsync(c => c.ClassID == classId, cancellationToken);
+        if (classRow is not null) classRow.TotalSessions += 1;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapToResponse(session);
+    }
 
     private static SessionResponse MapToResponse(Session s) => new()
     {

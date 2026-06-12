@@ -19,7 +19,7 @@ public interface IOfficeService
     Task CompleteAppointmentAsync(Guid id, CancellationToken cancellationToken);
 
     // Heuristic schedule suggestion.
-    AiScheduleResponse GenerateSchedule(AiScheduleRequest request);
+    Task<AiScheduleResponse> GenerateScheduleAsync(AiScheduleRequest request, CancellationToken cancellationToken);
 
     Task<PagedResult<AttendanceResponse>> GetAttendanceAsync(AttendanceListQuery query, CancellationToken cancellationToken);
     Task<AttendanceResponse> GetAttendanceByIdAsync(Guid sessionId, CancellationToken cancellationToken);
@@ -29,4 +29,7 @@ public interface IOfficeService
     Task<IncidentResponse> CreateIncidentAsync(CreateIncidentRequest request, Guid reporterId, string reporterName, string reporterRole, CancellationToken cancellationToken);
     Task InvestigateIncidentAsync(Guid incidentId, CancellationToken cancellationToken);
     Task ResolveIncidentAsync(Guid incidentId, ResolveIncidentRequest request, CancellationToken cancellationToken);
+
+    // Room inventory + free/occupied counts for the scheduling page.
+    Task<RoomInventoryResponse> GetRoomInventoryAsync(DateTime windowStart, DateTime windowEnd, CancellationToken cancellationToken);
 }

@@ -10,6 +10,16 @@ public class OfficeRepository(ApplicationDbContext dbContext) : IOfficeRepositor
 {
     private readonly ApplicationDbContext _dbContext = dbContext;
 
+    // Postgres 'timestamptz' columns require UTC-kind DateTimes. The client may send Utc ("...Z"),
+    // Local (with an offset), or Unspecified (no offset) kinds — convert rather than relabel so a
+    // local wall-clock time round-trips to the correct absolute instant. Mirrors SessionRepository.
+    private static DateTime AsUtc(DateTime dt) => dt.Kind switch
+    {
+        DateTimeKind.Utc => dt,
+        DateTimeKind.Local => dt.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc),
+    };
+
     public async Task<(List<AttendanceResponse> Items, int Total)> GetAttendanceAsync(string? statusWire, int page, int pageSize, CancellationToken cancellationToken)
     {
         var q = _dbContext.Sessions.AsNoTracking().AsQueryable();
@@ -143,7 +153,7 @@ public class OfficeRepository(ApplicationDbContext dbContext) : IOfficeRepositor
             Description = request.Description,
             WithName = request.WithName,
             WithUserId = request.WithUserId,
-            ScheduledAt = DateTime.SpecifyKind(request.ScheduledAt, DateTimeKind.Utc),
+            ScheduledAt = AsUtc(request.ScheduledAt),
             Status = AppointmentStatus.Scheduled,
             Notes = request.Notes,
             CreatedAt = DateTime.UtcNow
@@ -162,7 +172,7 @@ public class OfficeRepository(ApplicationDbContext dbContext) : IOfficeRepositor
         entity.Description = request.Description;
         entity.WithName = request.WithName;
         entity.WithUserId = request.WithUserId;
-        entity.ScheduledAt = DateTime.SpecifyKind(request.ScheduledAt, DateTimeKind.Utc);
+        entity.ScheduledAt = AsUtc(request.ScheduledAt);
         entity.Notes = request.Notes;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -271,4 +281,43 @@ public class OfficeRepository(ApplicationDbContext dbContext) : IOfficeRepositor
         CreatedAt = r.CreatedAt,
         ResolvedAt = r.ResolvedAt
     };
+
+    public async Task<RoomInventoryResponse> GetRoomInventoryAsync(DateTime windowStart, DateTime windowEnd, CancellationToken cancellationToken)
+    {
+        var rooms = await _dbContext.Rooms.AsNoTracking().OrderBy(r => r.Name).ToListAsync(cancellationToken);
+
+        // Real demand: distinct offline/hybrid classes with an active session overlapping the window.
+        var occupied = await _dbContext.Sessions.AsNoTracking()
+            .Where(s => s.Format != ClassFormat.Online
+                     && (s.Status == SessionStatus.Scheduled || s.Status == SessionStatus.InProgress)
+                     && s.StartAt < windowEnd && s.EndAt > windowStart)
+            .Select(s => s.ClassID)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
+        var total = rooms.Count;
+        if (occupied > total) occupied = total;
+
+        var roomDtos = rooms.Select((r, idx) => new RoomAvailabilityDto
+        {
+            Id = r.RoomID.ToString(),
+            Name = r.Name,
+            Capacity = r.Capacity,
+            Type = r.Type,
+            Building = r.Building,
+            IsOccupied = idx < occupied, // display snapshot; the Free count below is the authoritative figure
+        }).ToList();
+
+        return new RoomInventoryResponse
+        {
+            Rooms = roomDtos,
+            Summary = new RoomInventorySummary
+            {
+                Total = total,
+                Occupied = occupied,
+                Free = Math.Max(0, total - occupied),
+                OccupancyRate = total > 0 ? Math.Round((double)occupied / total, 2) : 0,
+            }
+        };
+    }
 }

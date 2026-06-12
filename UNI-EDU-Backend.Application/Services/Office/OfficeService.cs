@@ -11,6 +11,8 @@ namespace UNI_EDU_Backend.Application.Services.Office;
 public class OfficeService(
     IOfficeRepository officeRepo,
     IAdminRepository adminRepo,
+    INotificationRepository notificationRepo,
+    UNI_EDU_Backend.Application.Interfaces.IAiCompletionService aiCompletion,
     IValidator<CreateIncidentRequest> createIncidentValidator,
     IValidator<SaveAppointmentRequest> appointmentValidator) : IOfficeService
 {
@@ -18,6 +20,8 @@ public class OfficeService(
 
     private readonly IOfficeRepository _officeRepo = officeRepo;
     private readonly IAdminRepository _adminRepo = adminRepo;
+    private readonly INotificationRepository _notificationRepo = notificationRepo;
+    private readonly UNI_EDU_Backend.Application.Interfaces.IAiCompletionService _aiCompletion = aiCompletion;
     private readonly IValidator<CreateIncidentRequest> _createIncidentValidator = createIncidentValidator;
     private readonly IValidator<SaveAppointmentRequest> _appointmentValidator = appointmentValidator;
 
@@ -74,21 +78,50 @@ public class OfficeService(
             throw new NotFoundException($"Appointment with id '{id}' not found.");
     }
 
-    public AiScheduleResponse GenerateSchedule(AiScheduleRequest request)
+    public async Task<AiScheduleResponse> GenerateScheduleAsync(AiScheduleRequest request, CancellationToken cancellationToken)
     {
         var days = (request.PreferredDays is { Count: > 0 })
             ? request.PreferredDays
             : ["Thứ 2", "Thứ 4", "Thứ 6"];
         var time = string.IsNullOrWhiteSpace(request.PreferredTime) ? "18:00-20:00" : request.PreferredTime.Trim();
         var count = request.SessionsPerWeek < 1 ? 1 : Math.Min(request.SessionsPerWeek, days.Count);
+        var subjPart = string.IsNullOrWhiteSpace(request.Subject) ? "" : $" cho môn {request.Subject}";
+
+        // AI attempt: ask for an optimized weekly plan; gracefully fall back to the heuristic.
+        var system = "Bạn là trợ lý xếp lịch học. Chỉ trả về JSON hợp lệ, không thêm chữ nào khác.";
+        var user =
+            $"Hãy xếp {count} buổi học mỗi tuần{subjPart}. " +
+            $"Ưu tiên các ngày: {string.Join(", ", days)}; khung giờ ưu tiên: {time}. " +
+            "Giãn cách các buổi hợp lý trong tuần. " +
+            "Trả JSON đúng định dạng: {\"slots\":[{\"day\":\"Thứ 2\",\"time\":\"18:00-20:00\"}]}.";
+        var ai = await _aiCompletion.CompleteJsonAsync<ScheduleEnvelope>(system, user, cancellationToken);
+        if (ai?.Slots is { Count: > 0 })
+        {
+            var aiSlots = ai.Slots
+                .Where(s => !string.IsNullOrWhiteSpace(s.Day) && !string.IsNullOrWhiteSpace(s.Time))
+                .Take(count)
+                .Select(s => new AvailableSlotDto { Day = s.Day!.Trim(), Time = s.Time!.Trim() })
+                .ToList();
+            if (aiSlots.Count > 0)
+                return new AiScheduleResponse { Message = $"AI đề xuất {aiSlots.Count} buổi/tuần{subjPart}.", SuggestedSlots = aiSlots };
+        }
 
         var slots = days.Take(count).Select(d => new AvailableSlotDto { Day = d, Time = time }).ToList();
-
         return new AiScheduleResponse
         {
-            Message = $"Đề xuất {slots.Count} buổi/tuần{(string.IsNullOrWhiteSpace(request.Subject) ? "" : $" cho môn {request.Subject}")} (gợi ý theo quy tắc, chưa dùng AI).",
+            Message = $"Đề xuất {slots.Count} buổi/tuần{subjPart} (theo quy tắc — chưa có khoá AI).",
             SuggestedSlots = slots
         };
+    }
+
+    private sealed class ScheduleEnvelope
+    {
+        public List<ScheduleRow>? Slots { get; set; }
+    }
+    private sealed class ScheduleRow
+    {
+        public string? Day { get; set; }
+        public string? Time { get; set; }
     }
 
     private static AppointmentStatus? ParseAppointmentStatus(string? value) =>
@@ -122,6 +155,14 @@ public class OfficeService(
     {
         if (!await _officeRepo.ConfirmAttendanceAsync(sessionId, cancellationToken))
             throw new NotFoundException($"Session with id '{sessionId}' not found.");
+
+        // Notify the student and their linked parent that attendance was confirmed.
+        await _notificationRepo.NotifyStudentSideAsync(
+            sessionId,
+            "Điểm danh đã được xác nhận",
+            "Văn phòng đã xác nhận điểm danh buổi học. Vui lòng kiểm tra lịch học của con.",
+            "/parent/children",
+            cancellationToken);
     }
 
     public async Task<PagedResult<IncidentResponse>> GetIncidentsAsync(IncidentListQuery query, CancellationToken cancellationToken)
@@ -173,6 +214,9 @@ public class OfficeService(
             "high" => IncidentPriority.High,
             _ => IncidentPriority.Medium
         };
+
+    public Task<RoomInventoryResponse> GetRoomInventoryAsync(DateTime windowStart, DateTime windowEnd, CancellationToken cancellationToken) =>
+        _officeRepo.GetRoomInventoryAsync(windowStart, windowEnd, cancellationToken);
 
     private static IncidentStatus? ParseStatus(string? value) =>
         (value ?? string.Empty).Trim().ToLowerInvariant() switch

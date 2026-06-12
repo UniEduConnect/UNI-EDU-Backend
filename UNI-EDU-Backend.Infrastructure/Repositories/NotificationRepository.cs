@@ -91,4 +91,70 @@ public class NotificationRepository(ApplicationDbContext dbContext) : INotificat
             CreatedAt = entity.CreatedAt
         };
     }
+
+    public async Task NotifyStudentSideAsync(Guid sessionId, string title, string message, string? link, CancellationToken cancellationToken)
+    {
+        var info = await _dbContext.Sessions
+            .AsNoTracking()
+            .Where(s => s.SessionID == sessionId)
+            .Select(s => new { StudentUserId = s.Class.StudentID, ParentUserId = s.Class.Student.ParentID })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (info is null) return;
+
+        var recipients = new List<Guid> { info.StudentUserId };
+        if (info.ParentUserId is Guid pid) recipients.Add(pid);
+
+        await CreateForManyAsync(recipients, title, message, "info", link, cancellationToken);
+    }
+
+    public async Task NotifyTutorAsync(Guid sessionId, string title, string message, string? link, CancellationToken cancellationToken)
+    {
+        var tutorId = await _dbContext.Sessions
+            .AsNoTracking()
+            .Where(s => s.SessionID == sessionId)
+            .Select(s => (Guid?)s.Class.TutorID)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (tutorId is Guid tid)
+            await CreateForManyAsync(new[] { tid }, title, message, "warning", link, cancellationToken);
+    }
+
+    public async Task NotifySessionPartiesAsync(Guid sessionId, string title, string message, string? studentLink, string? parentLink, CancellationToken cancellationToken)
+    {
+        var info = await _dbContext.Sessions
+            .AsNoTracking()
+            .Where(s => s.SessionID == sessionId)
+            .Select(s => new { StudentUserId = s.Class.StudentID, ParentUserId = s.Class.Student.ParentID })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (info is null) return;
+
+        await CreateForManyAsync(new[] { info.StudentUserId }, title, message, "warning", studentLink, cancellationToken);
+        if (info.ParentUserId is Guid pid)
+            await CreateForManyAsync(new[] { pid }, title, message, "warning", parentLink, cancellationToken);
+    }
+
+    public async Task CreateForManyAsync(IEnumerable<Guid> userIds, string title, string message, string type, string? link, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var distinct = userIds.Distinct().ToList();
+        if (distinct.Count == 0) return;
+
+        foreach (var uid in distinct)
+        {
+            _dbContext.Notifications.Add(new Notification
+            {
+                NotificationID = Guid.NewGuid(),
+                UserID = uid,
+                Title = title,
+                Message = message,
+                Type = type,
+                Link = link,
+                IsRead = false,
+                CreatedAt = now
+            });
+        }
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

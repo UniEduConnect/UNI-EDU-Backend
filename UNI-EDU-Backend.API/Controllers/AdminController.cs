@@ -42,6 +42,48 @@ public class AdminController(IAdminService adminService) : ControllerBase
         });
     }
 
+    [HttpPost("users")]
+    public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
+    {
+        var adminId = ReadCallerIdOrThrow();
+        AdminUserResponse result = await _adminService.CreateUserAsync(request, adminId, cancellationToken);
+
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<AdminUserResponse>
+        {
+            StatusCode = StatusCodes.Status201Created,
+            Message = "User created successfully",
+            Data = result
+        });
+    }
+
+    [HttpPut("users/{id:guid}")]
+    public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)
+    {
+        var adminId = ReadCallerIdOrThrow();
+        AdminUserResponse result = await _adminService.UpdateUserAsync(id, request ?? new UpdateUserRequest(), adminId, cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<AdminUserResponse>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "User updated successfully",
+            Data = result
+        });
+    }
+
+    [HttpDelete("users/{id:guid}")]
+    public async Task<IActionResult> DeleteUser(Guid id, CancellationToken cancellationToken)
+    {
+        var adminId = ReadCallerIdOrThrow();
+        await _adminService.DeleteUserAsync(id, adminId, cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<object>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "User deleted successfully",
+            Data = null
+        });
+    }
+
     [HttpPost("users/{id:guid}/approve")]
     public async Task<IActionResult> Approve(Guid id, CancellationToken cancellationToken)
     {

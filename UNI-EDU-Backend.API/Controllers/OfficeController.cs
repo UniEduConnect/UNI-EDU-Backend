@@ -11,7 +11,7 @@ namespace UNI_EDU_Backend.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize(Roles = "Admin")] // Office portal maps to the Admin role in the backend.
+[Authorize(Roles = "Admin,Office")] // Office portal: Admin or Office staff.
 public class OfficeController(IOfficeService officeService) : ControllerBase
 {
     private readonly IOfficeService _officeService = officeService;
@@ -136,10 +136,22 @@ public class OfficeController(IOfficeService officeService) : ControllerBase
     }
 
     [HttpPost("ai-schedule")]
-    public IActionResult GenerateSchedule([FromBody] AiScheduleRequest request)
+    public async Task<IActionResult> GenerateSchedule([FromBody] AiScheduleRequest request, CancellationToken cancellationToken)
     {
-        var result = _officeService.GenerateSchedule(request ?? new AiScheduleRequest());
+        var result = await _officeService.GenerateScheduleAsync(request ?? new AiScheduleRequest(), cancellationToken);
         return Ok200(result, "Schedule generated");
+    }
+
+    // Room inventory + free/occupied counts. Window defaults to the next 24h.
+    [HttpGet("rooms")]
+    public async Task<IActionResult> GetRooms([FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken cancellationToken)
+    {
+        // Normalize to UTC kind so the timestamptz comparison in EF doesn't reject query params.
+        var start = DateTime.SpecifyKind(from ?? DateTime.UtcNow, DateTimeKind.Utc);
+        var end = DateTime.SpecifyKind(to ?? start.AddHours(24), DateTimeKind.Utc);
+        if (end < start) end = start.AddHours(24);
+        RoomInventoryResponse result = await _officeService.GetRoomInventoryAsync(start, end, cancellationToken);
+        return Ok200(result, "Room inventory retrieved successfully");
     }
 
     private IActionResult Ok200<T>(T? data, string message) where T : class =>

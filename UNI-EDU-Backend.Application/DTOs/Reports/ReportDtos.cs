@@ -6,6 +6,18 @@ public class MonthlyAmount
     public decimal Amount { get; set; }
 }
 
+public class MonthlyCount
+{
+    public string Month { get; set; } = string.Empty; // "yyyy-MM"
+    public int Count { get; set; }
+}
+
+public class TypeAmount
+{
+    public string Type { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+}
+
 public class AdminReportResponse
 {
     public int TotalUsers { get; set; }
@@ -13,6 +25,8 @@ public class AdminReportResponse
     public int TotalExams { get; set; }
     public decimal TotalRevenue { get; set; }
     public List<MonthlyAmount> MonthlyRevenue { get; set; } = [];
+    public List<MonthlyCount> NewUsersByMonth { get; set; } = [];
+    public List<TypeAmount> RevenueByType { get; set; } = [];
 }
 
 public class FinanceReportResponse

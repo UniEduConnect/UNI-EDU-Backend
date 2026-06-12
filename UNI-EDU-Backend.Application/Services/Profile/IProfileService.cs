@@ -20,4 +20,8 @@ public interface IProfileService
 
     Task<List<UNI_EDU_Backend.Application.DTOs.Tutors.AvailableSlotDto>> GetMyStudentAvailabilityAsync(Guid studentId, CancellationToken cancellationToken);
     Task<List<UNI_EDU_Backend.Application.DTOs.Tutors.AvailableSlotDto>> UpdateMyStudentAvailabilityAsync(Guid studentId, UNI_EDU_Backend.Application.DTOs.Tutors.UpdateAvailabilityRequest request, CancellationToken cancellationToken);
+    // Smart matching: weekly slots where both the student and the given tutor are free.
+    Task<List<UNI_EDU_Backend.Application.DTOs.Tutors.AvailableSlotDto>> GetCommonSlotsWithTutorAsync(Guid studentId, Guid tutorId, CancellationToken cancellationToken);
+    // AI-ranked study-slot suggestions (with a reason per slot) from the common free slots.
+    Task<List<UNI_EDU_Backend.Application.DTOs.Tutors.AiSlotSuggestionDto>> GetAiRankedSlotsWithTutorAsync(Guid studentId, Guid tutorId, CancellationToken cancellationToken);
 }

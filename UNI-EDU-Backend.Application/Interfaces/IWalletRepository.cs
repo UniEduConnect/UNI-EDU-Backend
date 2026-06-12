@@ -31,5 +31,10 @@ namespace UNI_EDU_Backend.Application.Interfaces.Repositories
         // are passed as wire strings (e.g. "withdrawal", "completed").
         Task<(List<AdminTransactionResponse> Items, int Total)> GetAllTransactionsAsync(
             string? type, string? status, int page, int pageSize, CancellationToken cancellationToken);
+
+        // Moves `amount` from one wallet to another in a single DB transaction (TransferOut/TransferIn
+        // records). Returns false if the source wallet is missing or has insufficient balance.
+        Task<bool> TransferAsync(
+            Guid fromUserId, Guid toUserId, decimal amount, string fromDescription, string toDescription, CancellationToken cancellationToken);
     }
 }

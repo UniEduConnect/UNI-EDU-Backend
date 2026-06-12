@@ -11,6 +11,10 @@ using UNI_EDU_Backend.API.Json;
 using UNI_EDU_Backend.Application.Services.Classes;
 using UNI_EDU_Backend.Application.Services.Sessions;
 using UNI_EDU_Backend.Application.Services.Parents;
+using UNI_EDU_Backend.Application.Services.Otp;
+using UNI_EDU_Backend.Application.Services.ClassRequests;
+using UNI_EDU_Backend.Application.Services.TutorPosts;
+using UNI_EDU_Backend.Application.Services.AiTests;
 using UNI_EDU_Backend.Application.Services.Trials;
 using UNI_EDU_Backend.Application.Services.Tutors;
 using UNI_EDU_Backend.Application.Services.Users;
@@ -30,6 +34,7 @@ using UNI_EDU_Backend.Application.Services.Dashboards;
 using UNI_EDU_Backend.Application.Services.Refunds;
 using UNI_EDU_Backend.Application.Services.Reports;
 using UNI_EDU_Backend.Infrastructure;
+using UNI_EDU_Backend.Infrastructure.Email;
 using UNI_EDU_Backend.Infrastructure.Payments;
 using UNI_EDU_Backend.Infrastructure.Repositories;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
@@ -60,6 +65,9 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IClassRepository, ClassRepository>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+builder.Services.AddScoped<IChildProgressRepository, ChildProgressRepository>();
+builder.Services.AddScoped<IEmailOtpRepository, EmailOtpRepository>();
+builder.Services.AddScoped<IStatsRepository, StatsRepository>();
 builder.Services.AddScoped<IWalletRepository, WalletRepository>();
 builder.Services.AddScoped<IWithdrawalRepository, WithdrawalRepository>();
 builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
@@ -71,6 +79,10 @@ builder.Services.AddScoped<IMessageRepository, MessageRepository>();
 builder.Services.AddScoped<IOfficeRepository, OfficeRepository>();
 builder.Services.AddScoped<IProfileRepository, ProfileRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<IParentChildLinkRepository, ParentChildLinkRepository>();
+builder.Services.AddScoped<IClassRequestRepository, ClassRequestRepository>();
+builder.Services.AddScoped<ITutorPostRepository, TutorPostRepository>();
+builder.Services.AddScoped<IAiTestRepository, AiTestRepository>();
 builder.Services.AddScoped<ITrialRepository, TrialRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
@@ -86,10 +98,23 @@ builder.Services.AddScoped<ITutorService, TutorService>();
 builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<IParentService, ParentService>();
+builder.Services.AddScoped<IParentChildLinkService, ParentChildLinkService>();
+builder.Services.AddScoped<IClassRequestService, ClassRequestService>();
+builder.Services.AddScoped<ITutorPostService, TutorPostService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<UNI_EDU_Backend.Application.Interfaces.IAiQuestionGenerator, UNI_EDU_Backend.Infrastructure.Ai.OpenAiQuestionGenerator>();
+builder.Services.AddScoped<UNI_EDU_Backend.Application.Interfaces.IAiCompletionService, UNI_EDU_Backend.Infrastructure.Ai.OpenAiCompletionService>();
+builder.Services.AddScoped<IAiTestService, AiTestService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<ISubjectService, SubjectService>();
 builder.Services.AddScoped<IQuestionService, QuestionService>();
 builder.Services.AddScoped<IExamService, ExamService>();
+builder.Services.AddScoped<IAiExamGenerationService, AiExamGenerationService>();
+
+// Email + OTP (registration email verification). SMTP settings bound from the "Smtp" config section.
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddScoped<UNI_EDU_Backend.Application.Interfaces.IEmailSender, SmtpEmailSender>();
+builder.Services.AddScoped<IEmailOtpService, EmailOtpService>();
 builder.Services.AddScoped<IMaterialService, MaterialService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IFinanceService, FinanceService>();
@@ -114,6 +139,11 @@ builder.Services.Configure<VnPayOptions>(builder.Configuration.GetSection("VnPay
 builder.Services.AddScoped<VnPayGateway>();
 builder.Services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<VnPayGateway>());
 builder.Services.AddScoped<IVnPayGateway>(sp => sp.GetRequiredService<VnPayGateway>());
+
+builder.Services.Configure<PayOsOptions>(builder.Configuration.GetSection("PayOs"));
+builder.Services.AddHttpClient<PayOsGateway>();
+builder.Services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<PayOsGateway>());
+builder.Services.AddScoped<IPayOsGateway>(sp => sp.GetRequiredService<PayOsGateway>());
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
@@ -176,6 +206,10 @@ builder.Services.AddCors(options =>
 
 var secretKey = builder.Configuration["Jwt:SecretKey"] ?? Env.GetString("JWT_SecretKey")
     ?? throw new InvalidOperationException("Jwt:SecretKey (or JWT_SecretKey env var) is not configured.");
+// Publish the resolved key back into configuration so everything that reads
+// IConfiguration["Jwt:SecretKey"] (e.g. AuthService.GenerateToken) gets the same
+// value — the signing and validation keys must always match.
+builder.Configuration["Jwt:SecretKey"] = secretKey;
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

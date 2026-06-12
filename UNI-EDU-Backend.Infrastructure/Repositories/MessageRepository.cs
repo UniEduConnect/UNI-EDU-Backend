@@ -106,7 +106,10 @@ public class MessageRepository(ApplicationDbContext dbContext) : IMessageReposit
                 c.Name,
                 TutorName = c.Tutor.FullName ?? c.Tutor.User.Fullname,
                 TutorAvatar = c.Tutor.AvatarUrl,
-                StudentName = c.Student.FullName ?? c.Student.User.Fullname
+                StudentName = c.Student.FullName ?? c.Student.User.Fullname,
+                ParentName = c.Student.Parent != null
+                    ? (c.Student.Parent.FullName ?? c.Student.Parent.User.Fullname)
+                    : null
             })
             .ToListAsync(cancellationToken);
 
@@ -123,9 +126,9 @@ public class MessageRepository(ApplicationDbContext dbContext) : IMessageReposit
         foreach (var c in classes)
         {
             byClass.TryGetValue(c.ClassID, out var msgs);
-            if (msgs is null || msgs.Count == 0) continue; // sidebar shows threads with messages
-
-            var last = msgs.OrderByDescending(m => m.CreatedAt).First();
+            // One thread per class — surfaced even before any message exists — so the caller
+            // can start a conversation with every student/tutor they share a class with.
+            var last = msgs is { Count: > 0 } ? msgs.OrderByDescending(m => m.CreatedAt).First() : null;
             var isTutor = trimmed == "Tutor";
 
             result.Add(new ConversationResponse
@@ -134,12 +137,19 @@ public class MessageRepository(ApplicationDbContext dbContext) : IMessageReposit
                 ClassName = c.Name ?? string.Empty,
                 OtherPartyName = isTutor ? (c.StudentName ?? string.Empty) : (c.TutorName ?? string.Empty),
                 OtherPartyAvatar = isTutor ? null : c.TutorAvatar,
-                LastMessage = last.Content,
-                LastTimestamp = last.CreatedAt,
-                UnreadCount = msgs.Count(m => m.SenderID != userId && !m.IsRead)
+                StudentName = c.StudentName ?? string.Empty,
+                ParentName = c.ParentName,
+                LastMessage = last?.Content,
+                LastTimestamp = last?.CreatedAt,
+                UnreadCount = msgs?.Count(m => m.SenderID != userId && !m.IsRead) ?? 0
             });
         }
 
-        return result.OrderByDescending(r => r.LastTimestamp).ToList();
+        // Threads with messages first (most recent first), then message-less threads by class name.
+        return result
+            .OrderByDescending(r => r.LastTimestamp.HasValue)
+            .ThenByDescending(r => r.LastTimestamp)
+            .ThenBy(r => r.ClassName)
+            .ToList();
     }
 }

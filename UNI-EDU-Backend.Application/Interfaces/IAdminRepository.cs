@@ -11,6 +11,12 @@ public interface IAdminRepository
     // Flips the moderation status; returns the updated row, or null if the user doesn't exist.
     Task<AdminUserResponse?> SetUserStatusAsync(Guid userId, UserStatus status, CancellationToken cancellationToken);
 
+    // Admin user CRUD. CreateUserAsync receives an already-hashed password.
+    Task<bool> EmailOrPhoneExistsAsync(string email, string phoneNumber, CancellationToken cancellationToken);
+    Task<AdminUserResponse> CreateUserAsync(CreateUserRequest request, string hashedPassword, CancellationToken cancellationToken);
+    Task<AdminUserResponse?> UpdateUserAsync(Guid userId, UpdateUserRequest request, CancellationToken cancellationToken);
+    Task<bool> DeleteUserAsync(Guid userId, CancellationToken cancellationToken);
+
     // Appends an audit entry. ActorName is resolved from the actor's User row when found.
     Task AddAuditLogAsync(Guid? actorUserId, string action, string target, CancellationToken cancellationToken);
     Task<(List<AuditLogResponse> Items, int Total)> GetAuditLogsAsync(int page, int pageSize, CancellationToken cancellationToken);

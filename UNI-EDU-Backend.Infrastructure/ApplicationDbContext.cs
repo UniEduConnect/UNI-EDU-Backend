@@ -38,6 +38,13 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<RefundRequest> RefundRequests { get; set; }
         public DbSet<Appointment> Appointments { get; set; }
         public DbSet<ExamAiConfig> ExamAiConfigs { get; set; }
+        public DbSet<ParentChildLinkRequest> ParentChildLinkRequests { get; set; }
+        public DbSet<ClassRequest> ClassRequests { get; set; }
+        public DbSet<TutorPost> TutorPosts { get; set; }
+        public DbSet<AiTestAttempt> AiTestAttempts { get; set; }
+        public DbSet<TutorPostApplication> TutorPostApplications { get; set; }
+        public DbSet<Room> Rooms { get; set; }
+        public DbSet<EmailOtp> EmailOtps { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -190,6 +197,60 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasOne(t => t.Subject)
                 .WithMany()
                 .HasForeignKey(t => t.SubjectID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ParentChildLinkRequest>()
+                .HasOne(r => r.Parent)
+                .WithMany()
+                .HasForeignKey(r => r.ParentID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ParentChildLinkRequest>()
+                .HasOne(r => r.Student)
+                .WithMany()
+                .HasForeignKey(r => r.StudentID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ClassRequest>()
+                .HasOne(r => r.Student)
+                .WithMany()
+                .HasForeignKey(r => r.StudentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ClassRequest>()
+                .HasOne(r => r.Subject)
+                .WithMany()
+                .HasForeignKey(r => r.SubjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TutorPost>()
+                .HasOne(p => p.Tutor)
+                .WithMany()
+                .HasForeignKey(p => p.TutorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TutorPost>()
+                .HasOne(p => p.Subject)
+                .WithMany()
+                .HasForeignKey(p => p.SubjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AiTestAttempt>()
+                .HasOne(a => a.Subject)
+                .WithMany()
+                .HasForeignKey(a => a.SubjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TutorPostApplication>()
+                .HasOne(a => a.TutorPost)
+                .WithMany()
+                .HasForeignKey(a => a.TutorPostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TutorPostApplication>()
+                .HasOne(a => a.Student)
+                .WithMany()
+                .HasForeignKey(a => a.StudentId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Withdrawal FKs: keep history if tutor deleted; null out reviewer link if their user is deleted.

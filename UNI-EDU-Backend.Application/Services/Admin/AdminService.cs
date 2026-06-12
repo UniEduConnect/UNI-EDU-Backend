@@ -9,13 +9,17 @@ namespace UNI_EDU_Backend.Application.Services.Admin;
 
 public class AdminService(
     IAdminRepository adminRepo,
-    IValidator<UpdateSystemSettingsRequest> settingsValidator) : IAdminService
+    IValidator<UpdateSystemSettingsRequest> settingsValidator,
+    IValidator<CreateUserRequest> createUserValidator,
+    IValidator<UpdateUserRequest> updateUserValidator) : IAdminService
 {
     private const int PageSize = 10;
     private const int AuditPageSize = 20;
 
     private readonly IAdminRepository _adminRepo = adminRepo;
     private readonly IValidator<UpdateSystemSettingsRequest> _settingsValidator = settingsValidator;
+    private readonly IValidator<CreateUserRequest> _createUserValidator = createUserValidator;
+    private readonly IValidator<UpdateUserRequest> _updateUserValidator = updateUserValidator;
 
     public async Task<PagedResult<AdminUserResponse>> GetUsersAsync(AdminUserListQuery query, CancellationToken cancellationToken)
     {
@@ -34,6 +38,42 @@ public class AdminService(
     public async Task<AdminUserResponse> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken) =>
         await _adminRepo.GetUserByIdAsync(userId, cancellationToken)
             ?? throw new NotFoundException($"User with id '{userId}' not found.");
+
+    public async Task<AdminUserResponse> CreateUserAsync(CreateUserRequest request, Guid adminId, CancellationToken cancellationToken)
+    {
+        await _createUserValidator.EnsureValidAsync(request, cancellationToken);
+
+        if (await _adminRepo.EmailOrPhoneExistsAsync(request.Email.Trim(), request.PhoneNumber.Trim(), cancellationToken))
+            throw new BadRequestException("Email or phone number already in use.");
+
+        var hashed = BCrypt.Net.BCrypt.HashPassword(request.Password);
+        var created = await _adminRepo.CreateUserAsync(request, hashed, cancellationToken);
+        await _adminRepo.AddAuditLogAsync(adminId, "Tạo tài khoản", $"{created.Name} ({created.Role})", cancellationToken);
+        return created;
+    }
+
+    public async Task<AdminUserResponse> UpdateUserAsync(Guid userId, UpdateUserRequest request, Guid adminId, CancellationToken cancellationToken)
+    {
+        await _updateUserValidator.EnsureValidAsync(request, cancellationToken);
+
+        var updated = await _adminRepo.UpdateUserAsync(userId, request, cancellationToken)
+            ?? throw new NotFoundException($"User with id '{userId}' not found.");
+        await _adminRepo.AddAuditLogAsync(adminId, "Cập nhật tài khoản", $"{updated.Name} ({updated.Role})", cancellationToken);
+        return updated;
+    }
+
+    public async Task DeleteUserAsync(Guid userId, Guid adminId, CancellationToken cancellationToken)
+    {
+        if (userId == adminId)
+            throw new BadRequestException("Bạn không thể xoá tài khoản của chính mình.");
+
+        var user = await _adminRepo.GetUserByIdAsync(userId, cancellationToken)
+            ?? throw new NotFoundException($"User with id '{userId}' not found.");
+        var deleted = await _adminRepo.DeleteUserAsync(userId, cancellationToken);
+        if (!deleted)
+            throw new NotFoundException($"User with id '{userId}' not found.");
+        await _adminRepo.AddAuditLogAsync(adminId, "Xoá tài khoản", $"{user.Name} ({user.Role})", cancellationToken);
+    }
 
     public Task<AdminUserResponse> ApproveUserAsync(Guid userId, Guid adminId, CancellationToken cancellationToken) =>
         ChangeStatusAsync(userId, UserStatus.Approved, adminId, "Duyệt tài khoản", cancellationToken);

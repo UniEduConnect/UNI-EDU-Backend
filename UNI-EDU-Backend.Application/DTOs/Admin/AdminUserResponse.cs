@@ -16,5 +16,12 @@ public class AdminUserResponse
     public string? Avatar { get; set; }
     public string? School { get; set; }
     public string? Bio { get; set; }
+
+    // Role-specific (for the admin edit form). Null when not applicable.
+    public int? Grade { get; set; }           // student
+    public string? Gender { get; set; }       // tutor/teacher
+    public string? Degree { get; set; }       // tutor/teacher
+    public string? StudentIdNumber { get; set; } // tutor/teacher
+
     public DateTime CreatedAt { get; set; }
 }
