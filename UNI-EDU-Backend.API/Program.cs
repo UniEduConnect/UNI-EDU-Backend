@@ -192,8 +192,10 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 
+// Override per-environment with ALLOWED_ORIGINS (comma-separated). The default covers
+// local dev (Vite on 8080 / CRA on 3000) plus the production domains.
 var allowedOrigins = builder.Configuration["ALLOWED_ORIGINS"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-    ?? ["http://localhost:3000", "http://localhost:8080"];
+    ?? ["http://localhost:3000", "http://localhost:8080", "https://unieducation.net", "https://www.unieducation.net"];
 
 builder.Services.AddCors(options =>
 {
