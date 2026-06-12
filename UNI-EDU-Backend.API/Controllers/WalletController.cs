@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using UNI_EDU_Backend.API.Commons;
 using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Wallets;
@@ -146,15 +146,46 @@ public class WalletController(IWalletService walletService) : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> VnPayIpn(CancellationToken cancellationToken)
     {
-        var providedHash = Request.Query["vnp_SecureHash"].ToString();
-        var vnpFields = Request.Query
-            .Where(kv => kv.Key.StartsWith("vnp_")
-                         && kv.Key != "vnp_SecureHash"
-                         && kv.Key != "vnp_SecureHashType")
-            .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
-
+        var (vnpFields, providedHash) = ReadRawVnpFields();
         var response = await _walletService.HandleVnPayIpnAsync(vnpFields, providedHash, cancellationToken);
         return Ok(response);
+    }
+
+    // Browser-return confirm: the FE return page forwards VNPay's signed query params here so the
+    // wallet credits immediately (verified by signature, idempotent) without waiting on the IPN.
+    [HttpGet("deposit/vnpay-return")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VnPayReturn(CancellationToken cancellationToken)
+    {
+        var (vnpFields, providedHash) = ReadRawVnpFields();
+        VnPayReturnResult result = await _walletService.HandleVnPayReturnAsync(vnpFields, providedHash, cancellationToken);
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<VnPayReturnResult>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "OK",
+            Data = result,
+        });
+    }
+
+    // Parse the RAW query string (values stay URL-encoded exactly as VNPay sent them) so the
+    // signature is verified over the same bytes VNPay signed — Request.Query would decode them.
+    private (Dictionary<string, string> Fields, string Hash) ReadRawVnpFields()
+    {
+        var raw = Request.QueryString.Value ?? string.Empty;
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+        var hash = string.Empty;
+
+        foreach (var pair in raw.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var i = pair.IndexOf('=');
+            var key = i < 0 ? pair : pair[..i];
+            var val = i < 0 ? string.Empty : pair[(i + 1)..];
+
+            if (string.Equals(key, "vnp_SecureHash", StringComparison.OrdinalIgnoreCase)) { hash = val; continue; }
+            if (string.Equals(key, "vnp_SecureHashType", StringComparison.OrdinalIgnoreCase)) continue;
+            if (key.StartsWith("vnp_", StringComparison.Ordinal)) fields[key] = val;
+        }
+        return (fields, hash);
     }
 
     private (Guid UserId, string Role) ReadCallerOrThrow()

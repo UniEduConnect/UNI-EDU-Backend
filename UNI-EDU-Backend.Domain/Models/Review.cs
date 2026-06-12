@@ -23,6 +23,9 @@ namespace UNI_EDU_Backend.Domain.Models
         public string Comment { get; set; }
         public DateTime ReviewDate { get; set; }
 
+        // Office/admin moderation: hidden reviews are kept but flagged.
+        public bool IsHidden { get; set; }
+
         // Navigation Properties
         public virtual User Reviewer { get; set; }
 

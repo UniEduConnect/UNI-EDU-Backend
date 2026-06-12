@@ -12,6 +12,12 @@ public class User
     public string Email { get; set; }
     public string PhoneNumber { get; set; }
     public UserRole Role { get; set; }
+
+    // Account moderation state (admin portal). Defaults to Approved so login is never gated by
+    // this column; admins can move accounts to Rejected/Suspended, and new tutor registrations
+    // start as Pending to populate the approval queue.
+    public UserStatus Status { get; set; } = UserStatus.Approved;
+
     public DateTime CreatedAt { get; set; }
 
     // Navigation Properties

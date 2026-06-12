@@ -29,7 +29,25 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<Session> Sessions { get; set; }
         public DbSet<ClassMaterial> ClassMaterials { get; set; }
         public DbSet<Withdrawal> Withdrawals { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<Message> Messages { get; set; }
+        public DbSet<Incident> Incidents { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+        public DbSet<SystemSetting> SystemSettings { get; set; }
         public DbSet<TrialBooking> TrialBookings { get; set; }
+        public DbSet<ChatMessage> ChatMessages { get; set; }
+        public DbSet<DmMessage> DmMessages { get; set; }
+        public DbSet<ClassChatRead> ClassChatReads { get; set; }
+        public DbSet<RefundRequest> RefundRequests { get; set; }
+        public DbSet<Appointment> Appointments { get; set; }
+        public DbSet<ExamAiConfig> ExamAiConfigs { get; set; }
+        public DbSet<ParentChildLinkRequest> ParentChildLinkRequests { get; set; }
+        public DbSet<ClassRequest> ClassRequests { get; set; }
+        public DbSet<TutorPost> TutorPosts { get; set; }
+        public DbSet<AiTestAttempt> AiTestAttempts { get; set; }
+        public DbSet<TutorPostApplication> TutorPostApplications { get; set; }
+        public DbSet<Room> Rooms { get; set; }
+        public DbSet<EmailOtp> EmailOtps { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -184,6 +202,60 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasForeignKey(t => t.SubjectID)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<ParentChildLinkRequest>()
+                .HasOne(r => r.Parent)
+                .WithMany()
+                .HasForeignKey(r => r.ParentID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ParentChildLinkRequest>()
+                .HasOne(r => r.Student)
+                .WithMany()
+                .HasForeignKey(r => r.StudentID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ClassRequest>()
+                .HasOne(r => r.Student)
+                .WithMany()
+                .HasForeignKey(r => r.StudentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ClassRequest>()
+                .HasOne(r => r.Subject)
+                .WithMany()
+                .HasForeignKey(r => r.SubjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TutorPost>()
+                .HasOne(p => p.Tutor)
+                .WithMany()
+                .HasForeignKey(p => p.TutorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TutorPost>()
+                .HasOne(p => p.Subject)
+                .WithMany()
+                .HasForeignKey(p => p.SubjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AiTestAttempt>()
+                .HasOne(a => a.Subject)
+                .WithMany()
+                .HasForeignKey(a => a.SubjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TutorPostApplication>()
+                .HasOne(a => a.TutorPost)
+                .WithMany()
+                .HasForeignKey(a => a.TutorPostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TutorPostApplication>()
+                .HasOne(a => a.Student)
+                .WithMany()
+                .HasForeignKey(a => a.StudentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // Withdrawal FKs: keep history if tutor deleted; null out reviewer link if their user is deleted.
             modelBuilder.Entity<Withdrawal>()
                 .HasOne(w => w.Tutor)
@@ -195,6 +267,78 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasOne(w => w.Reviewer)
                 .WithMany()
                 .HasForeignKey(w => w.ReviewerID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // AuditLog keeps history even if the acting admin is deleted (null out the link).
+            modelBuilder.Entity<AuditLog>()
+                .HasOne(a => a.Actor)
+                .WithMany()
+                .HasForeignKey(a => a.ActorUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Message: cascade with its class; restrict on sender to avoid multiple cascade paths.
+            modelBuilder.Entity<Message>()
+                .HasOne(m => m.Class)
+                .WithMany()
+                .HasForeignKey(m => m.ClassID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Message>()
+                .HasOne(m => m.Sender)
+                .WithMany()
+                .HasForeignKey(m => m.SenderID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Incident: cascade with its class; null out the optional session/reporter links on delete.
+            modelBuilder.Entity<Incident>()
+                .HasOne(i => i.Class)
+                .WithMany()
+                .HasForeignKey(i => i.ClassID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Incident>()
+                .HasOne(i => i.Session)
+                .WithMany()
+                .HasForeignKey(i => i.SessionID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Incident>()
+                .HasOne(i => i.Reporter)
+                .WithMany()
+                .HasForeignKey(i => i.ReporterUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Notification: cascade with its recipient user.
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.User)
+                .WithMany()
+                .HasForeignKey(n => n.UserID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // RefundRequest: cascade with its class; null out requester/reviewer links on user delete.
+            modelBuilder.Entity<RefundRequest>()
+                .HasOne(r => r.Class)
+                .WithMany()
+                .HasForeignKey(r => r.ClassID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RefundRequest>()
+                .HasOne(r => r.Requester)
+                .WithMany()
+                .HasForeignKey(r => r.RequesterUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<RefundRequest>()
+                .HasOne(r => r.Reviewer)
+                .WithMany()
+                .HasForeignKey(r => r.ReviewerID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Appointment: optional link to a user (null out on user delete).
+            modelBuilder.Entity<Appointment>()
+                .HasOne(a => a.WithUser)
+                .WithMany()
+                .HasForeignKey(a => a.WithUserId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             // Postgres array / jsonb columns on Tutor
@@ -220,10 +364,43 @@ namespace UNI_EDU_Backend.Infrastructure
                     v => JsonSerializer.Serialize(v ?? new List<ClassScheduleSlot>(), JsonbOptions),
                     v => DeserializeJsonList<ClassScheduleSlot>(v));
 
+            // Student weekly availability (jsonb), mirroring Tutor.AvailableSlots.
+            modelBuilder.Entity<Student>()
+                .Property(s => s.AvailableSlots)
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v ?? new List<AvailableSlot>(), JsonbOptions),
+                    v => DeserializeJsonList<AvailableSlot>(v));
+
             // Homework attachment URLs captured when a tutor ends a session (nullable text[]).
             modelBuilder.Entity<Session>()
                 .Property(s => s.HomeworkFiles)
                 .HasColumnType("text[]");
+
+            // Class chat: message cascades with the class; the sender link is Restrict so a
+            // chat message never deletes a user.
+            modelBuilder.Entity<ChatMessage>()
+                .HasOne(m => m.Class)
+                .WithMany()
+                .HasForeignKey(m => m.ClassID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ChatMessage>()
+                .HasOne(m => m.Sender)
+                .WithMany()
+                .HasForeignKey(m => m.SenderID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ChatMessage>()
+                .HasIndex(m => new { m.ClassID, m.SentAt });
+
+            // Parent ↔ tutor DM: plain Guid columns, indexed by conversation pair for lookup.
+            modelBuilder.Entity<DmMessage>()
+                .HasIndex(d => new { d.TutorID, d.ParentID, d.SentAt });
+
+            // Per-(class, user) read marker for the class chat.
+            modelBuilder.Entity<ClassChatRead>()
+                .HasKey(r => new { r.ClassID, r.UserID });
         }
 
         // Shared options for jsonb columns. camelCase naming matches the on-disk shape

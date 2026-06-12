@@ -1,6 +1,6 @@
 using UNI_EDU_Backend.Application.DTOs.Wallets;
 
-namespace UNI_EDU_Backend.Application.Interfaces.Repositories
+namespace UNI_EDU_Backend.Application.Interfaces
 {
     public interface IWalletRepository
     {
@@ -31,5 +31,15 @@ namespace UNI_EDU_Backend.Application.Interfaces.Repositories
         // Returns null if the transaction id doesn't exist. The service uses this to enforce
         // ownership + "must still be pending" + "must be a test row" before calling SettleDepositAsync.
         Task<TestDepositLookup?> LookupTestDepositAsync(Guid transactionId, CancellationToken cancellationToken);
+
+        // System-wide ledger for the finance portal, newest first. Optional type/status filters
+        // are passed as wire strings (e.g. "withdrawal", "completed").
+        Task<(List<AdminTransactionResponse> Items, int Total)> GetAllTransactionsAsync(
+            string? type, string? status, int page, int pageSize, CancellationToken cancellationToken);
+
+        // Moves `amount` from one wallet to another in a single DB transaction (TransferOut/TransferIn
+        // records). Returns false if the source wallet is missing or has insufficient balance.
+        Task<bool> TransferAsync(
+            Guid fromUserId, Guid toUserId, decimal amount, string fromDescription, string toDescription, CancellationToken cancellationToken);
     }
 }

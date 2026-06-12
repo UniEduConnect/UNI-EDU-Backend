@@ -111,11 +111,15 @@ public class ClassService(
         // Admin-only: enforced by [Authorize(Roles = "Admin")] on the controller action.
         await _updateValidator.EnsureValidAsync(request, cancellationToken);
 
-        // Validator restricts status to searching/active/paused — completed/cancelled are rejected
-        // there because they move escrow and belong to the settlement flow.
-        var status = ParseStatus(request.Status);
+        // Validate referenced entities when reassigning tutor/student/subject.
+        if (request.TutorId is not null && !await _classRepo.TutorExistsAsync(request.TutorId.Value, cancellationToken))
+            throw new NotFoundException($"Tutor with id '{request.TutorId}' not found.");
+        if (request.StudentId is not null && !await _classRepo.StudentExistsAsync(request.StudentId.Value, cancellationToken))
+            throw new NotFoundException($"Student with id '{request.StudentId}' not found.");
+        if (request.SubjectId is not null && await _classRepo.GetSubjectNameAsync(request.SubjectId.Value, cancellationToken) is null)
+            throw new NotFoundException($"Subject with id '{request.SubjectId}' not found.");
 
-        var found = await _classRepo.UpdatePartialAsync(classId, request.Name, status, cancellationToken);
+        var found = await _classRepo.UpdatePartialAsync(classId, request, cancellationToken);
         if (!found)
             throw new NotFoundException($"Class with id '{classId}' not found.");
 

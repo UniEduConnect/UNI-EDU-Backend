@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentValidation;
 using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Wallets;
@@ -18,7 +19,8 @@ public class WalletService(
     IValidator<DepositTestRequest> depositTestValidator,
     IEnumerable<IPaymentGateway> paymentGateways,
     IMomoGateway momoGateway,
-    IVnPayGateway vnPayGateway) : IWalletService
+    IVnPayGateway vnPayGateway,
+    IPayOsGateway payOsGateway) : IWalletService
 {
     private const int PageSize = 10;
 
@@ -35,6 +37,7 @@ public class WalletService(
     private readonly IEnumerable<IPaymentGateway> _paymentGateways = paymentGateways;
     private readonly IMomoGateway _momoGateway = momoGateway;
     private readonly IVnPayGateway _vnPayGateway = vnPayGateway;
+    private readonly IPayOsGateway _payOsGateway = payOsGateway;
 
     public async Task<WalletResponse> GetMyWalletAsync(Guid callerUserId, string callerRole, CancellationToken cancellationToken)
     {
@@ -105,7 +108,11 @@ public class WalletService(
         // VND is a whole-unit currency — pin the amount so the pending row matches what the
         // provider confirms in the IPN (avoids spurious amount-mismatch failures).
         var amount = Math.Truncate(request.Amount);
-        var orderId = $"DEP-{Guid.NewGuid():N}";
+        // PayOS requires a numeric orderCode; we store it as the transaction's ProviderRef
+        // (CreatePendingDepositAsync sets ProviderRef = orderId), so the webhook settles by it.
+        var orderId = method == "payos"
+            ? ((DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 100) + Random.Shared.Next(100)).ToString()
+            : $"DEP-{Guid.NewGuid():N}";
         const string orderInfo = "Nap tien vao vi UNI-EDU";
 
         // Create the Pending ledger row BEFORE calling the provider, so the IPN always has a
@@ -169,6 +176,60 @@ public class WalletService(
             DepositSettleOutcome.Credited       => new VnPayIpnResponse { RspCode = "00", Message = "Confirm Success" },
             _                                   => new VnPayIpnResponse { RspCode = "99", Message = "Unknown error" }
         };
+    }
+
+    // Confirms a deposit from the signed VNPay browser-return params. Same trust anchor + idempotent
+    // settle as the IPN, so the wallet credits even if the server-to-server IPN never arrives.
+    public async Task<VnPayReturnResult> HandleVnPayReturnAsync(IReadOnlyDictionary<string, string> vnpFields, string providedHash, CancellationToken cancellationToken)
+    {
+        if (!_vnPayGateway.VerifyCallbackSignature(vnpFields, providedHash))
+            return new VnPayReturnResult { Status = "invalid-signature" };
+
+        if (!vnpFields.TryGetValue("vnp_TxnRef", out var orderId) ||
+            !vnpFields.TryGetValue("vnp_Amount", out var amountStr) ||
+            !vnpFields.TryGetValue("vnp_ResponseCode", out var responseCode) ||
+            !long.TryParse(amountStr, out var amountSubunits))
+        {
+            return new VnPayReturnResult { Status = "invalid" };
+        }
+
+        var success = responseCode == "00";
+        var transactionNo = vnpFields.TryGetValue("vnp_TransactionNo", out var tn) ? tn : string.Empty;
+        var confirmedAmount = amountSubunits / 100m;
+
+        var outcome = await _walletRepo.SettleDepositAsync(orderId, success, transactionNo, confirmedAmount, cancellationToken);
+
+        return new VnPayReturnResult
+        {
+            Amount = confirmedAmount,
+            Status = outcome switch
+            {
+                DepositSettleOutcome.Credited => "credited",
+                DepositSettleOutcome.AlreadySettled => "already",
+                DepositSettleOutcome.AmountMismatch => "amount-mismatch",
+                DepositSettleOutcome.NotFound => "not-found",
+                DepositSettleOutcome.Failed => "failed",
+                _ => "invalid",
+            },
+        };
+    }
+
+    public async Task<DepositSettleOutcome> HandlePayOsWebhookAsync(PayOsWebhookPayload payload, CancellationToken cancellationToken)
+    {
+        // Signature is the only trust anchor — the caller is unauthenticated.
+        if (!_payOsGateway.VerifyWebhookSignature(payload))
+            throw new Exceptions.UnauthorizedAccessException("Invalid PayOS webhook signature.");
+
+        if (payload.Data.ValueKind != JsonValueKind.Object || !payload.Data.TryGetProperty("orderCode", out var ocEl))
+            return DepositSettleOutcome.NotFound;
+
+        var orderCode = ocEl.GetInt64().ToString(); // == the stored ProviderRef
+        var amount = payload.Data.TryGetProperty("amount", out var amEl) ? amEl.GetInt64() : 0L;
+        var providerTxn = payload.Data.TryGetProperty("reference", out var rfEl) ? (rfEl.GetString() ?? string.Empty) : string.Empty;
+        // PayOS confirms success via top-level success / code "00".
+        var success = payload.Success || string.Equals(payload.Code, "00", StringComparison.Ordinal);
+
+        return await _walletRepo.SettleDepositAsync(orderCode, success, providerTxn, amount, cancellationToken);
     }
 
     public async Task<WithdrawalResponse> CreateWithdrawalAsync(CreateWithdrawalRequest request, Guid callerUserId, CancellationToken cancellationToken)

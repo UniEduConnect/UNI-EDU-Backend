@@ -14,8 +14,8 @@ public interface IClassRepository
     Task<ClassDetailResponse?> GetByIdAsync(Guid classId, CancellationToken cancellationToken);
 
     // Applies only the supplied (non-null) fields to an existing class. Returns false if no
-    // class with that id exists. Scope is limited to safe metadata — see UpdateClassRequest.
-    Task<bool> UpdatePartialAsync(Guid classId, string? name, ClassStatus? status, CancellationToken cancellationToken);
+    // class with that id exists.
+    Task<bool> UpdatePartialAsync(Guid classId, UpdateClassRequest request, CancellationToken cancellationToken);
 
     // Lists classes scoped to the caller's role: Tutor/Student by own id, Parent by their
     // children, Admin sees all. Optionally filtered by status. Paged.
