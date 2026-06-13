@@ -75,10 +75,11 @@ public class StudentsController(IProfileService profileService, IParentChildLink
     }
 
     // AI-ranked study slots (with a reason per slot) between this student and the given tutor.
+    // sessionsPerWeek (optional) tells the AI how many sessions/week to schedule from the overlap.
     [HttpGet("me/ai-slots/{tutorId:guid}")]
-    public async Task<IActionResult> GetAiSlots(Guid tutorId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAiSlots(Guid tutorId, [FromQuery] int? sessionsPerWeek, CancellationToken cancellationToken)
     {
-        List<AiSlotSuggestionDto> result = await _profileService.GetAiRankedSlotsWithTutorAsync(ReadCallerIdOrThrow(), tutorId, cancellationToken);
+        List<AiSlotSuggestionDto> result = await _profileService.GetAiRankedSlotsWithTutorAsync(ReadCallerIdOrThrow(), tutorId, sessionsPerWeek, cancellationToken);
 
         return StatusCode(StatusCodes.Status200OK, new ApiResponse<List<AiSlotSuggestionDto>>
         {
