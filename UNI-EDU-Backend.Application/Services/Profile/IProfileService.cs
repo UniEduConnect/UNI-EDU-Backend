@@ -23,5 +23,6 @@ public interface IProfileService
     // Smart matching: weekly slots where both the student and the given tutor are free.
     Task<List<UNI_EDU_Backend.Application.DTOs.Tutors.AvailableSlotDto>> GetCommonSlotsWithTutorAsync(Guid studentId, Guid tutorId, CancellationToken cancellationToken);
     // AI-ranked study-slot suggestions (with a reason per slot) from the common free slots.
-    Task<List<UNI_EDU_Backend.Application.DTOs.Tutors.AiSlotSuggestionDto>> GetAiRankedSlotsWithTutorAsync(Guid studentId, Guid tutorId, CancellationToken cancellationToken);
+    // sessionsPerWeek constrains how many slots to schedule (bounded by the available overlap).
+    Task<List<UNI_EDU_Backend.Application.DTOs.Tutors.AiSlotSuggestionDto>> GetAiRankedSlotsWithTutorAsync(Guid studentId, Guid tutorId, int? sessionsPerWeek, CancellationToken cancellationToken);
 }

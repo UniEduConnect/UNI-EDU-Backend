@@ -40,11 +40,17 @@ public class OpenAiCompletionService(IConfiguration configuration, ILogger<OpenA
                 response_format = new { type = "json_object" }
             };
 
-            using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
+            // Provider-agnostic: defaults to OpenAI, override Ai:BaseUrl (Ai__BaseUrl) for
+            // OpenAI-compatible gateways like OpenRouter (https://openrouter.ai/api/v1).
+            var baseUrl = (_configuration["Ai:BaseUrl"] ?? "https://api.openai.com/v1").TrimEnd('/');
+            using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions")
             {
                 Content = JsonContent.Create(body)
             };
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            // OpenRouter ranking headers (ignored by OpenAI).
+            req.Headers.TryAddWithoutValidation("HTTP-Referer", "https://unieducation.net");
+            req.Headers.TryAddWithoutValidation("X-Title", "Uni Education");
 
             using var resp = await Http.SendAsync(req, cancellationToken);
             resp.EnsureSuccessStatusCode();
