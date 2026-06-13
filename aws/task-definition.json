@@ -31,7 +31,9 @@
         { "name": "Smtp__UseStartTls", "value": "true" },
         { "name": "Smtp__FromName", "value": "UNI EDU" },
         { "name": "Smtp__FromEmail", "value": "tranngochan29052004@gmail.com" },
-        { "name": "Smtp__User", "value": "tranngochan29052004@gmail.com" }
+        { "name": "Smtp__User", "value": "tranngochan29052004@gmail.com" },
+        { "name": "Ai__BaseUrl", "value": "https://openrouter.ai/api/v1" },
+        { "name": "Ai__OpenAiModel", "value": "deepseek/deepseek-chat" }
       ],
       "secrets": [
         {
@@ -61,6 +63,10 @@
         {
           "name": "Smtp__Password",
           "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/Smtp__Password"
+        },
+        {
+          "name": "OPENAI_API_KEY",
+          "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/OPENAI_API_KEY"
         }
       ],
       "logConfiguration": {
