@@ -133,16 +133,22 @@ public class ProfileService(
 
     // AI-ranked study slots: takes the tutor∩student free slots and asks the AI to pick & rank
     // the best ones with a short reason. Falls back to the raw common slots if AI is unavailable.
-    public async Task<List<AiSlotSuggestionDto>> GetAiRankedSlotsWithTutorAsync(Guid studentId, Guid tutorId, CancellationToken cancellationToken)
+    public async Task<List<AiSlotSuggestionDto>> GetAiRankedSlotsWithTutorAsync(Guid studentId, Guid tutorId, int? sessionsPerWeek, CancellationToken cancellationToken)
     {
         var common = await GetCommonSlotsWithTutorAsync(studentId, tutorId, cancellationToken);
         if (common.Count == 0) return new();
+
+        // How many sessions/week to schedule — bounded by what's actually available in the overlap.
+        var target = sessionsPerWeek is > 0
+            ? Math.Min(sessionsPerWeek.Value, common.Count)
+            : Math.Min(5, common.Count);
 
         var commonText = string.Join("; ", common.Select(s => $"{s.Day} {s.Time}"));
         var system = "Bạn là trợ lý sắp xếp lịch học. Chỉ trả về JSON hợp lệ, không thêm chữ nào khác.";
         var user =
             $"Các khung giờ mà CẢ gia sư và học sinh đều rảnh: {commonText}. " +
-            "Hãy chọn và xếp hạng tối đa 5 khung giờ học tốt nhất (ưu tiên buổi tối các ngày trong tuần, tránh quá khuya, giãn cách hợp lý). " +
+            $"Hãy chọn và xếp hạng ĐÚNG {target} buổi học/tuần tốt nhất (ưu tiên buổi tối các ngày trong tuần, " +
+            "tránh quá khuya, giãn cách đều các buổi trong tuần). " +
             "Trả JSON đúng định dạng: {\"slots\":[{\"day\":\"Thứ 2\",\"time\":\"19:00-21:00\",\"reason\":\"lý do ngắn\",\"score\":90}]}. " +
             "score là số 0-100, reason bằng tiếng Việt ngắn gọn. Chỉ chọn trong danh sách khung giờ đã cho.";
 
@@ -161,12 +167,13 @@ public class ProfileService(
                     Score = Math.Clamp(s.Score, 0, 100),
                 })
                 .OrderByDescending(s => s.Score)
+                .Take(target)
                 .ToList();
             if (ranked.Count > 0) return ranked;
         }
 
         // Fallback (no AI key / parse failure): rank the common slots deterministically.
-        return common.Select((s, i) => new AiSlotSuggestionDto
+        return common.Take(target).Select((s, i) => new AiSlotSuggestionDto
         {
             Day = s.Day, Time = s.Time, Reason = "Cả gia sư và học sinh đều rảnh", Score = Math.Max(50, 90 - i * 5),
         }).ToList();
