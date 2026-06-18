@@ -4,9 +4,11 @@ using Microsoft.AspNetCore.Mvc;
 using UNI_EDU_Backend.API.Commons;
 using UNI_EDU_Backend.Application.DTOs.Parents;
 using UNI_EDU_Backend.Application.DTOs.Profile;
+using UNI_EDU_Backend.Application.DTOs.Streaks;
 using UNI_EDU_Backend.Application.DTOs.Tutors;
 using UNI_EDU_Backend.Application.Services.Parents;
 using UNI_EDU_Backend.Application.Services.Profile;
+using UNI_EDU_Backend.Application.Services.Streaks;
 using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
 
 namespace UNI_EDU_Backend.API.Controllers;
@@ -14,10 +16,11 @@ namespace UNI_EDU_Backend.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [Authorize(Roles = "Student")]
-public class StudentsController(IProfileService profileService, IParentChildLinkService linkService) : ControllerBase
+public class StudentsController(IProfileService profileService, IParentChildLinkService linkService, IStreakService streakService) : ControllerBase
 {
     private readonly IProfileService _profileService = profileService;
     private readonly IParentChildLinkService _linkService = linkService;
+    private readonly IStreakService _streakService = streakService;
 
     [HttpGet("me")]
     public async Task<IActionResult> GetMe(CancellationToken cancellationToken)
@@ -136,6 +139,31 @@ public class StudentsController(IProfileService profileService, IParentChildLink
             StatusCode = StatusCodes.Status200OK,
             Message = "Đã từ chối liên kết phụ huynh.",
             Data = null
+        });
+    }
+
+    // Daily study streak. Reading is non-mutating; check-in records today's activity.
+    [HttpGet("me/streak")]
+    public async Task<IActionResult> GetStreak(CancellationToken cancellationToken)
+    {
+        var result = await _streakService.GetAsync(ReadCallerIdOrThrow(), cancellationToken);
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<StreakResponse>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get learning streak successfully",
+            Data = result
+        });
+    }
+
+    [HttpPost("me/streak/checkin")]
+    public async Task<IActionResult> CheckInStreak(CancellationToken cancellationToken)
+    {
+        var result = await _streakService.CheckInAsync(ReadCallerIdOrThrow(), cancellationToken);
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<StreakResponse>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Streak check-in recorded",
+            Data = result
         });
     }
 
