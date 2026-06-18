@@ -48,6 +48,7 @@ namespace UNI_EDU_Backend.Infrastructure
         public DbSet<TutorPostApplication> TutorPostApplications { get; set; }
         public DbSet<Room> Rooms { get; set; }
         public DbSet<EmailOtp> EmailOtps { get; set; }
+        public DbSet<LearningStreak> LearningStreaks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -148,6 +149,13 @@ namespace UNI_EDU_Backend.Infrastructure
                 .HasOne(w => w.User)
                 .WithOne()
                 .HasForeignKey<Wallet>(w => w.UserID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // LearningStreak 1-to-1 with User (UserID is PK + FK)
+            modelBuilder.Entity<LearningStreak>()
+                .HasOne(s => s.User)
+                .WithOne()
+                .HasForeignKey<LearningStreak>(s => s.UserID)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<WalletTransaction>()
