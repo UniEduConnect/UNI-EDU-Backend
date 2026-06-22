@@ -132,6 +132,7 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITrialService, TrialService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<UNI_EDU_Backend.Application.Services.Streaks.IStreakService, UNI_EDU_Backend.Application.Services.Streaks.StreakService>();
 builder.Services.AddScoped<IRefundService, RefundService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 
