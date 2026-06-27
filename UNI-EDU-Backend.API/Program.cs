@@ -43,6 +43,7 @@ using UNI_EDU_Backend.Infrastructure;
 using UNI_EDU_Backend.Infrastructure.Email;
 using UNI_EDU_Backend.Infrastructure.Payments;
 using UNI_EDU_Backend.Infrastructure.Repositories;
+using UNI_EDU_Backend.Infrastructure.Storage;
 using UnauthorizedAccessException = UNI_EDU_Backend.Application.Exceptions.UnauthorizedAccessException;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -124,6 +125,10 @@ builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp")
 builder.Services.AddScoped<UNI_EDU_Backend.Application.Interfaces.IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IEmailOtpService, EmailOtpService>();
 builder.Services.AddScoped<IMaterialService, MaterialService>();
+
+// File storage (avatars, images) backed by AWS S3. Settings bound from the "S3" section.
+builder.Services.Configure<S3Options>(builder.Configuration.GetSection("S3"));
+builder.Services.AddScoped<IFileStorageService, S3FileStorageService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IFinanceService, FinanceService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
