@@ -15,5 +15,6 @@ public interface IClassRequestRepository
 
     Task<(string Status, Guid StudentId, Guid SubjectId)?> GetAcceptInfoAsync(Guid requestId, CancellationToken cancellationToken);
 
-    Task AssignAsync(Guid requestId, Guid tutorId, CancellationToken cancellationToken);
+    // Assigns the tutor + materializes a Class; returns the new ClassID (for deep-linking).
+    Task<Guid> AssignAsync(Guid requestId, Guid tutorId, CancellationToken cancellationToken);
 }
