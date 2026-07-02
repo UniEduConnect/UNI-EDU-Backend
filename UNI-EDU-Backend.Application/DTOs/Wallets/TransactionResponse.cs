@@ -15,7 +15,7 @@ public class TransactionResponse
     public string Description { get; set; } = string.Empty;
     public string Date { get; set; } = string.Empty;
 
-    // No status column on WalletTransaction yet — every stored row is settled.
+    // Settlement state mapped from WalletTransaction.Status: pending | completed | failed.
     public string Status { get; set; } = "completed";
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
