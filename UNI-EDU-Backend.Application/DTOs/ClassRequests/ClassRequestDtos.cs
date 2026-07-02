@@ -9,6 +9,8 @@ public class CreateClassRequestRequest
     public int Grade { get; set; }
     public string? PreferredSchedule { get; set; }
     public int? Budget { get; set; }
+    // Minimum learning commitment in months (>= 3).
+    public int? DurationMonths { get; set; }
     public string? Note { get; set; }
 
     // Only used when a Parent posts on behalf of a linked child; ignored for Student callers.
@@ -21,6 +23,9 @@ public class CreateClassRequestValidator : AbstractValidator<CreateClassRequestR
     {
         RuleFor(x => x.SubjectId).NotEmpty().WithMessage("Vui lòng chọn môn học.");
         RuleFor(x => x.Grade).InclusiveBetween(1, 12).WithMessage("Lớp không hợp lệ.");
+        RuleFor(x => x.DurationMonths)
+            .NotNull().WithMessage("Vui lòng nhập thời lượng học.")
+            .GreaterThanOrEqualTo(3).WithMessage("Thời lượng học tối thiểu là 3 tháng.");
     }
 }
 
@@ -41,6 +46,7 @@ public class ClassRequestResponse
     public string Subject { get; set; } = string.Empty;
     public string? PreferredSchedule { get; set; }
     public int? Budget { get; set; }
+    public int? DurationMonths { get; set; }
     public string? Note { get; set; }
     public string Status { get; set; } = "open";
     public string? AssignedTutorName { get; set; }

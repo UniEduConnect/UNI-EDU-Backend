@@ -23,6 +23,7 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
             Grade = request.Grade,
             PreferredSchedule = request.PreferredSchedule,
             Budget = request.Budget,
+            DurationMonths = request.DurationMonths,
             Note = request.Note,
             Status = "open",
             CreatedAt = DateTime.UtcNow
@@ -71,10 +72,10 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
         return row is null ? null : (row.Status, row.StudentId, row.SubjectId);
     }
 
-    public async Task AssignAsync(Guid requestId, Guid tutorId, CancellationToken cancellationToken)
+    public async Task<Guid> AssignAsync(Guid requestId, Guid tutorId, CancellationToken cancellationToken)
     {
         var req = await _dbContext.Set<ClassRequest>().FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
-        if (req is null) return;
+        if (req is null) return Guid.Empty;
 
         req.Status = "assigned";
         req.AssignedTutorId = tutorId;
@@ -87,9 +88,10 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
             .Select(s => s.SubjectName)
             .FirstOrDefaultAsync(cancellationToken) ?? "Lớp học";
 
+        var classId = Guid.NewGuid();
         _dbContext.Classes.Add(new Class
         {
-            ClassID = Guid.NewGuid(),
+            ClassID = classId,
             TutorID = tutorId,
             StudentID = req.StudentId,
             SubjectID = req.SubjectId,
@@ -109,6 +111,7 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        return classId;
     }
 
     // Expression (not a method) so EF Core translates it to a SQL projection with
@@ -125,6 +128,7 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
         Subject = r.Subject.SubjectName,
         PreferredSchedule = r.PreferredSchedule,
         Budget = r.Budget,
+        DurationMonths = r.DurationMonths,
         Note = r.Note,
         Status = r.Status,
         AssignedTutorName = null,

@@ -2027,3 +2027,39 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260702054615_AddClassRequestDurationMonths') THEN
+    ALTER TABLE "ClassRequests" ADD "DurationMonths" integer;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260702054615_AddClassRequestDurationMonths') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260702054615_AddClassRequestDurationMonths', '10.0.8');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260702100158_AddWithdrawalLedgerTransactionId') THEN
+    ALTER TABLE "Withdrawals" ADD "LedgerTransactionId" uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260702100158_AddWithdrawalLedgerTransactionId') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260702100158_AddWithdrawalLedgerTransactionId', '10.0.8');
+    END IF;
+END $EF$;
+COMMIT;
+

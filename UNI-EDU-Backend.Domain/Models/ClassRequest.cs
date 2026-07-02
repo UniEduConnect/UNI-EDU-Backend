@@ -14,6 +14,8 @@ namespace UNI_EDU_Backend.Domain.Models
         public int Grade { get; set; }
         public string? PreferredSchedule { get; set; }
         public int? Budget { get; set; }
+        // Minimum learning commitment in months (>= 3). Nullable for rows created before this field.
+        public int? DurationMonths { get; set; }
         public string? Note { get; set; }
 
         // "open" | "assigned" | "cancelled"
