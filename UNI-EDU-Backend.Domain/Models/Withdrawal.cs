@@ -37,6 +37,10 @@ namespace UNI_EDU_Backend.Domain.Models
         // Free-text reason/comment from the reviewer (especially for rejections).
         public string? ReviewNote { get; set; }
 
+        // Ledger row mirroring this withdrawal so it appears in the tutor's transaction
+        // history (Pending on request → Completed on approve / Failed on reject).
+        public Guid? LedgerTransactionId { get; set; }
+
         public virtual Tutor Tutor { get; set; } = null!;
         public virtual User? Reviewer { get; set; }
     }

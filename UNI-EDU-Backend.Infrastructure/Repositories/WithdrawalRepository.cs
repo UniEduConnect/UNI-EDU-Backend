@@ -43,7 +43,24 @@ public class WithdrawalRepository(ApplicationDbContext dbContext) : IWithdrawalR
             Status = WithdrawalStatus.Pending,
             RequestedAt = now
         };
+
+        // Mirror the request in the ledger (pending, negative = outflow) so it shows in
+        // the tutor's transaction history immediately. Approve/reject updates this row's status.
+        var ledgerTx = new WalletTransaction
+        {
+            TransactionID = Guid.NewGuid(),
+            UserID = tutorId,
+            Type = WalletTxType.Withdrawal,
+            Amount = -request.Amount,
+            Status = WalletTxStatus.Pending,
+            Method = method,
+            Description = $"Rút tiền về {request.BankName} ({request.BankAccount})",
+            CreatedAt = now
+        };
+        withdrawal.LedgerTransactionId = ledgerTx.TransactionID;
+
         _dbContext.Withdrawals.Add(withdrawal);
+        _dbContext.WalletTransactions.Add(ledgerTx);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await dbTx.CommitAsync(cancellationToken);
@@ -134,18 +151,29 @@ public class WithdrawalRepository(ApplicationDbContext dbContext) : IWithdrawalR
         withdrawal.ReviewerID = reviewerId;
         withdrawal.ReviewNote = note;
 
-        // Funds were already debited at request time — just record the payout in the ledger.
-        _dbContext.WalletTransactions.Add(new WalletTransaction
+        // Funds were already debited at request time — settle the pending ledger row.
+        var ledger = withdrawal.LedgerTransactionId is Guid ledgerId
+            ? await _dbContext.WalletTransactions.FirstOrDefaultAsync(t => t.TransactionID == ledgerId, cancellationToken)
+            : null;
+        if (ledger is not null)
         {
-            TransactionID = Guid.NewGuid(),
-            UserID = withdrawal.TutorID,
-            Type = WalletTxType.Withdrawal,
-            Amount = withdrawal.Amount,
-            Status = WalletTxStatus.Completed,
-            Method = withdrawal.Method,
-            Description = $"Withdrawal payout to {withdrawal.BankName} ({withdrawal.BankAccount})",
-            CreatedAt = now
-        });
+            ledger.Status = WalletTxStatus.Completed;
+        }
+        else
+        {
+            // Legacy withdrawals created before the ledger link — insert a completed payout row.
+            _dbContext.WalletTransactions.Add(new WalletTransaction
+            {
+                TransactionID = Guid.NewGuid(),
+                UserID = withdrawal.TutorID,
+                Type = WalletTxType.Withdrawal,
+                Amount = -withdrawal.Amount,
+                Status = WalletTxStatus.Completed,
+                Method = withdrawal.Method,
+                Description = $"Rút tiền về {withdrawal.BankName} ({withdrawal.BankAccount})",
+                CreatedAt = now
+            });
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
@@ -182,6 +210,14 @@ public class WithdrawalRepository(ApplicationDbContext dbContext) : IWithdrawalR
         wallet.Balance += withdrawal.Amount;
         wallet.UpdatedAt = now;
 
+        // Mark the pending withdrawal ledger row as failed…
+        if (withdrawal.LedgerTransactionId is Guid ledgerId)
+        {
+            var ledger = await _dbContext.WalletTransactions.FirstOrDefaultAsync(t => t.TransactionID == ledgerId, cancellationToken);
+            if (ledger is not null) ledger.Status = WalletTxStatus.Failed;
+        }
+
+        // …and record the refund of the locked amount back to the wallet.
         _dbContext.WalletTransactions.Add(new WalletTransaction
         {
             TransactionID = Guid.NewGuid(),
@@ -189,7 +225,7 @@ public class WithdrawalRepository(ApplicationDbContext dbContext) : IWithdrawalR
             Type = WalletTxType.Refund,
             Amount = withdrawal.Amount,
             Status = WalletTxStatus.Completed,
-            Description = "Refund for rejected withdrawal request",
+            Description = "Hoàn tiền do yêu cầu rút bị từ chối",
             CreatedAt = now
         });
 
