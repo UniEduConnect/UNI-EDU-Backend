@@ -54,6 +54,22 @@ public class RefundRepository(ApplicationDbContext dbContext) : IRefundRepositor
         return (items, total);
     }
 
+    public async Task<(List<RefundResponse> Items, int Total)> GetForTutorAsync(Guid tutorId, RefundStatus? status, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var q = _dbContext.RefundRequests.AsNoTracking().Where(r => r.Class.TutorID == tutorId);
+        if (status is not null) q = q.Where(r => r.Status == status);
+
+        var total = await q.CountAsync(cancellationToken);
+        var items = await q
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(Projection)
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
+
     public async Task<RefundReviewResult> ApproveAsync(Guid refundId, Guid reviewerId, string? note, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
