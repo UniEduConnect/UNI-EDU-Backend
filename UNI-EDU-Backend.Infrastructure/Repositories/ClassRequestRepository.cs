@@ -23,6 +23,7 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
             Grade = request.Grade,
             PreferredSchedule = request.PreferredSchedule,
             Budget = request.Budget,
+            DurationMonths = request.DurationMonths,
             Note = request.Note,
             Status = "open",
             CreatedAt = DateTime.UtcNow
@@ -125,6 +126,7 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
         Subject = r.Subject.SubjectName,
         PreferredSchedule = r.PreferredSchedule,
         Budget = r.Budget,
+        DurationMonths = r.DurationMonths,
         Note = r.Note,
         Status = r.Status,
         AssignedTutorName = null,
