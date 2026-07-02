@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.Exceptions;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
@@ -140,49 +141,11 @@ public class ClassRepository(ApplicationDbContext dbContext) : IClassRepository
         };
     }
 
-    /// <summary>
-    /// Walk the calendar forward from <c>StartDate</c>. For every day that matches a configured
-    /// <c>WeeklySlots</c> entry, emit one session per slot (ordered by start time) until
-    /// <paramref name="total"/> sessions are placed.
-    /// </summary>
-    private static List<Session> BuildPlaceholderSessions(Class c, int total, DateTime now)
-    {
-        var sessions = new List<Session>(total);
-        if (total <= 0 || c.WeeklySlots == null || c.WeeklySlots.Count == 0)
-            return sessions;
-
-        var slotsByDay = c.WeeklySlots
-            .GroupBy(s => s.DayOfWeek)
-            .ToDictionary(g => g.Key, g => g.OrderBy(s => s.StartTime).ToList());
-
-        var cursor = DateOnly.FromDateTime(c.StartDate);
-        // Worst case: 1 session/week -> total weeks. Cap walk at total*7 + 7 days as a safety net.
-        var maxDaysToWalk = (total * 7) + 7;
-
-        for (var dayOffset = 0; dayOffset < maxDaysToWalk && sessions.Count < total; dayOffset++)
-        {
-            var date = cursor.AddDays(dayOffset);
-            if (!slotsByDay.TryGetValue(date.DayOfWeek, out var daySlots)) continue;
-
-            foreach (var slot in daySlots)
-            {
-                if (sessions.Count >= total) break;
-
-                sessions.Add(new Session
-                {
-                    SessionID = Guid.NewGuid(),
-                    ClassID = c.ClassID,
-                    StartAt = date.ToDateTime(slot.StartTime, DateTimeKind.Utc),
-                    EndAt = date.ToDateTime(slot.EndTime, DateTimeKind.Utc),
-                    Status = SessionStatus.Scheduled,
-                    Format = c.Format,
-                    CreatedAt = now
-                });
-            }
-        }
-
-        return sessions;
-    }
+    // Walks the calendar forward from StartDate against WeeklySlots to emit placeholder
+    // Session rows — delegates to the shared SessionScheduling helper (also used by
+    // ClassRequestRepository when a class is created from an accepted class request).
+    private static List<Session> BuildPlaceholderSessions(Class c, int total, DateTime now) =>
+        SessionScheduling.BuildPlaceholderSessions(c.ClassID, c.Format, c.StartDate, c.WeeklySlots ?? new(), total, now);
 
     private static ClassFormat ParseFormat(string raw) =>
         (raw ?? string.Empty).ToLowerInvariant() switch

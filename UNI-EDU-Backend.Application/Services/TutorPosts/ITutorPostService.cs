@@ -6,7 +6,7 @@ namespace UNI_EDU_Backend.Application.Services.TutorPosts;
 public interface ITutorPostService
 {
     Task CreateAsync(Guid tutorId, CreateTutorPostRequest request, CancellationToken cancellationToken);
-    Task<PagedResult<TutorPostResponse>> GetOpenAsync(TutorPostListQuery query, CancellationToken cancellationToken);
+    Task<PagedResult<TutorPostResponse>> GetOpenAsync(TutorPostListQuery query, Guid callerId, CancellationToken cancellationToken);
     Task<List<TutorPostResponse>> GetMineAsync(Guid tutorId, CancellationToken cancellationToken);
     Task CloseAsync(Guid tutorId, Guid postId, CancellationToken cancellationToken);
 
