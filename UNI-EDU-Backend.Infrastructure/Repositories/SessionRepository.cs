@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.Classes;
 using UNI_EDU_Backend.Application.DTOs.Sessions;
 using UNI_EDU_Backend.Application.Exceptions;
@@ -232,12 +233,16 @@ public class SessionRepository(ApplicationDbContext dbContext) : ISessionReposit
 
     public async Task<SessionResponse> CreateAsync(Guid classId, DateTime startAt, DateTime endAt, ClassFormat format, CancellationToken cancellationToken)
     {
-        // Postgres 'timestamptz' columns require UTC-kind DateTimes; client sends local/unspecified.
+        // Postgres 'timestamptz' columns require UTC-kind DateTimes. The client sends a plain
+        // "yyyy-MM-ddTHH:mm:ss" (no offset) picked from a Vietnam-local <input type="time">, which
+        // JSON deserializes as Kind=Unspecified — interpret that as Vietnam time and convert to its
+        // true UTC instant (previously this just slapped a Utc label on the Vietnam-local value,
+        // storing a time 7 hours off from what the tutor actually picked).
         static DateTime AsUtc(DateTime dt) => dt.Kind switch
         {
             DateTimeKind.Utc => dt,
             DateTimeKind.Local => dt.ToUniversalTime(),
-            _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc),
+            _ => SessionScheduling.VietnamToUtc(dt),
         };
 
         var session = new Session

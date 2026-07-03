@@ -82,33 +82,50 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
         req.AssignedAt = DateTime.UtcNow;
 
         // Materialize a real Class so the match shows up in everyone's class list
-        // (tutor / student / parent). No escrow — fee/schedule are arranged later.
+        // (tutor / student / parent). No escrow — fee is arranged later.
         var subjectName = await _dbContext.Subjects.AsNoTracking()
             .Where(s => s.SubjectID == req.SubjectId)
             .Select(s => s.SubjectName)
             .FirstOrDefaultAsync(cancellationToken) ?? "Lớp học";
 
+        var now = DateTime.UtcNow;
         var classId = Guid.NewGuid();
-        _dbContext.Classes.Add(new Class
+
+        // Build the timetable from the student's requested schedule (e.g. "T2 19:00-21:00,
+        // T5 18:00-20:00"): the class starts on the Monday of NEXT week, and we pre-generate
+        // Session rows to cover the requested minimum commitment (DurationMonths).
+        var weeklySlots = SessionScheduling.ParsePreferredSchedule(req.PreferredSchedule);
+        var startDate = SessionScheduling.NextWeekMonday(now);
+        var totalSessions = weeklySlots.Count > 0
+            ? weeklySlots.Count * SessionScheduling.WeeksForDuration(req.DurationMonths)
+            : 0;
+
+        var classRow = new Class
         {
             ClassID = classId,
             TutorID = tutorId,
             StudentID = req.StudentId,
             SubjectID = req.SubjectId,
             Name = $"Lớp {subjectName}",
-            StartDate = DateTime.UtcNow,
+            StartDate = startDate,
             TuitionFee = req.Budget ?? 0,
             Status = ClassStatus.Active,
             Format = ClassFormat.Online,
-            WeeklySlots = new(),
-            TotalSessions = 0,
+            WeeklySlots = weeklySlots,
+            TotalSessions = totalSessions,
             CompletedSessions = 0,
             EscrowAmount = 0,
             EscrowReleased = 0,
             EscrowStatus = EscrowStatus.Pending,
             ReleaseMilestone = 0,
-            CreatedAt = DateTime.UtcNow
-        });
+            CreatedAt = now
+        };
+
+        var sessions = SessionScheduling.BuildPlaceholderSessions(
+            classId, classRow.Format, startDate, weeklySlots, totalSessions, now);
+
+        _dbContext.Classes.Add(classRow);
+        _dbContext.Sessions.AddRange(sessions);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return classId;

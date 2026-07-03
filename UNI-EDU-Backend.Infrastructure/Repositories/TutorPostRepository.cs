@@ -22,6 +22,7 @@ public class TutorPostRepository(ApplicationDbContext dbContext) : ITutorPostRep
             GradeLevels = request.GradeLevels,
             HourlyRate = request.HourlyRate,
             PreferredSchedule = request.PreferredSchedule,
+            DurationMonths = request.DurationMonths,
             Note = request.Note,
             Status = "open",
             CreatedAt = DateTime.UtcNow
@@ -29,7 +30,7 @@ public class TutorPostRepository(ApplicationDbContext dbContext) : ITutorPostRep
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<PagedResult<TutorPostResponse>> GetOpenAsync(TutorPostListQuery query, int pageSize, CancellationToken cancellationToken)
+    public async Task<PagedResult<TutorPostResponse>> GetOpenAsync(TutorPostListQuery query, int pageSize, Guid callerId, CancellationToken cancellationToken)
     {
         var q = _dbContext.Set<TutorPost>().AsNoTracking().Where(p => p.Status == "open");
 
@@ -48,7 +49,27 @@ public class TutorPostRepository(ApplicationDbContext dbContext) : ITutorPostRep
             .OrderByDescending(p => p.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(MapProjection)
+            // callerId is captured in the closure so EF translates the pending-application
+            // check into a correlated EXISTS subquery per row.
+            .Select(p => new TutorPostResponse
+            {
+                Id = p.Id,
+                TutorId = p.TutorId,
+                TutorName = p.Tutor.FullName ?? p.Tutor.User.Fullname,
+                TutorAvatar = p.Tutor.AvatarUrl,
+                Rating = p.Tutor.AverageRating ?? 0,
+                SubjectId = p.SubjectId,
+                Subject = p.Subject.SubjectName,
+                GradeLevels = p.GradeLevels,
+                HourlyRate = p.HourlyRate,
+                PreferredSchedule = p.PreferredSchedule,
+                DurationMonths = p.DurationMonths,
+                Note = p.Note,
+                Status = p.Status,
+                CreatedAt = p.CreatedAt,
+                HasPendingApplication = _dbContext.Set<TutorPostApplication>()
+                    .Any(a => a.TutorPostId == p.Id && a.StudentId == callerId && a.Status == "pending")
+            })
             .ToListAsync(cancellationToken);
 
         return new PagedResult<TutorPostResponse> { Items = items, Total = total, Page = page, PageSize = pageSize };
@@ -122,51 +143,80 @@ public class TutorPostRepository(ApplicationDbContext dbContext) : ITutorPostRep
             })
             .ToListAsync(cancellationToken);
 
-    public async Task<(Guid SubjectId, Guid StudentId, string Status)?> GetApplicationForAcceptAsync(Guid appId, Guid tutorId, CancellationToken cancellationToken)
+    public async Task<(Guid SubjectId, Guid StudentId, string Status, string PostStatus)?> GetApplicationForAcceptAsync(Guid appId, Guid tutorId, CancellationToken cancellationToken)
     {
         var row = await _dbContext.Set<TutorPostApplication>().AsNoTracking()
             .Where(a => a.Id == appId && a.TutorId == tutorId)
-            .Select(a => new { a.SubjectId, a.StudentId, a.Status })
+            .Select(a => new { a.SubjectId, a.StudentId, a.Status, PostStatus = a.TutorPost.Status })
             .FirstOrDefaultAsync(cancellationToken);
-        return row is null ? null : (row.SubjectId, row.StudentId, row.Status);
+        return row is null ? null : (row.SubjectId, row.StudentId, row.Status, row.PostStatus);
     }
 
     public async Task AcceptApplicationAsync(Guid appId, CancellationToken cancellationToken)
     {
+        await using var tx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
         var app = await _dbContext.Set<TutorPostApplication>().FirstOrDefaultAsync(a => a.Id == appId, cancellationToken);
         if (app is null) return;
         app.Status = "accepted";
         app.RespondedAt = DateTime.UtcNow;
 
         // Materialize a real Class so the match shows up in everyone's class list.
-        // No escrow — fee/schedule are arranged later between tutor and student.
+        // No escrow — fee is arranged later between tutor and student.
         var post = await _dbContext.Set<TutorPost>().AsNoTracking()
             .Where(p => p.Id == app.TutorPostId)
-            .Select(p => new { p.HourlyRate, SubjectName = p.Subject.SubjectName })
+            .Select(p => new { p.HourlyRate, p.PreferredSchedule, p.DurationMonths, SubjectName = p.Subject.SubjectName })
             .FirstOrDefaultAsync(cancellationToken);
 
-        _dbContext.Classes.Add(new Class
+        var now = DateTime.UtcNow;
+        var classId = Guid.NewGuid();
+
+        // Same timetable treatment as ClassRequestRepository.AssignAsync: parse the tutor's
+        // posted schedule, start next week, and pre-generate Session rows sized to the
+        // tutor's posted DurationMonths commitment (falls back to 3 months if unset — old
+        // posts created before this field existed).
+        var weeklySlots = SessionScheduling.ParsePreferredSchedule(post?.PreferredSchedule);
+        var startDate = SessionScheduling.NextWeekMonday(now);
+        var totalSessions = weeklySlots.Count > 0
+            ? weeklySlots.Count * SessionScheduling.WeeksForDuration(post?.DurationMonths)
+            : 0;
+
+        var classRow = new Class
         {
-            ClassID = Guid.NewGuid(),
+            ClassID = classId,
             TutorID = app.TutorId,
             StudentID = app.StudentId,
             SubjectID = app.SubjectId,
             Name = $"Lớp {post?.SubjectName ?? "học"}",
-            StartDate = DateTime.UtcNow,
+            StartDate = startDate,
             TuitionFee = post?.HourlyRate ?? 0,
             Status = ClassStatus.Active,
             Format = ClassFormat.Online,
-            WeeklySlots = new(),
-            TotalSessions = 0,
+            WeeklySlots = weeklySlots,
+            TotalSessions = totalSessions,
             CompletedSessions = 0,
             EscrowAmount = 0,
             EscrowReleased = 0,
             EscrowStatus = EscrowStatus.Pending,
             ReleaseMilestone = 0,
-            CreatedAt = DateTime.UtcNow
-        });
+            CreatedAt = now
+        };
+
+        var sessions = SessionScheduling.BuildPlaceholderSessions(
+            classId, classRow.Format, startDate, weeklySlots, totalSessions, now);
+
+        _dbContext.Classes.Add(classRow);
+        _dbContext.Sessions.AddRange(sessions);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Close the post — it's a single "slot"; once matched into a class it drops off
+        // both the tutor's own post list ("Đã đóng") and every student's open-posts browse list.
+        await _dbContext.Set<TutorPost>()
+            .Where(p => p.Id == app.TutorPostId)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, "closed"), cancellationToken);
+
+        await tx.CommitAsync(cancellationToken);
     }
 
     // Expression (not a method) so EF Core translates it to a SQL projection with
@@ -184,6 +234,7 @@ public class TutorPostRepository(ApplicationDbContext dbContext) : ITutorPostRep
         GradeLevels = p.GradeLevels,
         HourlyRate = p.HourlyRate,
         PreferredSchedule = p.PreferredSchedule,
+        DurationMonths = p.DurationMonths,
         Note = p.Note,
         Status = p.Status,
         CreatedAt = p.CreatedAt

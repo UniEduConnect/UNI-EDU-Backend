@@ -250,17 +250,45 @@ namespace UNI_EDU_Backend.Application.Services.Auths
                 return Convert.ToBase64String(randomNumber);
             }
         }
-        private void SetRefreshTokenCookie(string refreshToken)
+        private void SetRefreshTokenCookie(string refreshToken) =>
+            _httpContext.HttpContext.Response.Cookies.Append(
+                "refreshToken", refreshToken, BuildRefreshTokenCookieOptions(DateTime.UtcNow.AddDays(7)));
+
+        public void ClearRefreshTokenCookie() =>
+            _httpContext.HttpContext.Response.Cookies.Append(
+                "refreshToken", "", BuildRefreshTokenCookieOptions(DateTime.UtcNow.AddDays(-1)));
+
+        // Cookie must be Secure (HTTPS-only) to pair with SameSite=None for a genuinely
+        // cross-site FE/API deployment (e.g. unieducation.net calling a separate API domain
+        // in production — see the CORS origins in Program.cs). Locally the FE dev server
+        // proxies /api through Vite (vite.config.ts), so the browser only ever talks to
+        // http://localhost:8080 — a Secure cookie is silently DROPPED there (never stored),
+        // which is exactly what broke the refresh flow: every silent refresh / 401 retry sent
+        // no cookie, "Refresh token is missing", and the user got logged out constantly.
+        //
+        // Default: secure in Production, not secure otherwise. Override explicitly via
+        // REFRESH_COOKIE_SECURE=true/false for deployments that don't fit that assumption
+        // (e.g. the docker-compose "Production" profile run locally without TLS).
+        private CookieOptions BuildRefreshTokenCookieOptions(DateTime expires)
         {
-            // Set the refresh token in a secure cookie
-            var cookieOptions = new CookieOptions
+            var secure = ResolveRefreshCookieSecure();
+            return new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
-                Expires = DateTime.UtcNow.AddDays(7),
-                SameSite = SameSiteMode.Strict
+                Secure = secure,
+                // SameSite=None requires Secure=true (browsers reject None without Secure), so
+                // the two flags always move together.
+                SameSite = secure ? SameSiteMode.None : SameSiteMode.Lax,
+                Expires = expires
             };
-            _httpContext.HttpContext.Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
+        }
+
+        private bool ResolveRefreshCookieSecure()
+        {
+            if (bool.TryParse(_configuration["REFRESH_COOKIE_SECURE"], out var explicitValue))
+                return explicitValue;
+
+            return string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"], "Production", StringComparison.OrdinalIgnoreCase);
         }
     }
 }
