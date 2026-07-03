@@ -23,6 +23,18 @@ public static class SessionScheduling
     private static readonly TimeOnly DefaultStart = new(19, 0);
     private static readonly TimeSpan DefaultDuration = TimeSpan.FromMinutes(90);
 
+    // The app has no per-user timezone setting — everyone (weekly-slot pickers, "add a
+    // session" forms, etc.) enters and reads times in Vietnam time. Vietnam doesn't observe
+    // DST, so a fixed +7 offset is safe (no TimeZoneInfo lookup needed).
+    private static readonly TimeSpan VietnamOffset = TimeSpan.FromHours(7);
+
+    // Interpret a naive DateTime (Kind is ignored) as Vietnam local time and convert it to
+    // the true UTC instant for storage in a `timestamp with time zone` column. Previously
+    // callers just slapped DateTimeKind.Utc on the Vietnam-local value without subtracting
+    // the offset, so every stored session was 7 hours off from what the user actually picked.
+    public static DateTime VietnamToUtc(DateTime vietnamLocal) =>
+        new DateTimeOffset(DateTime.SpecifyKind(vietnamLocal, DateTimeKind.Unspecified), VietnamOffset).UtcDateTime;
+
     // Parses the schedule text built by the FE's buildSchedule() (PostTutorRequest.tsx),
     // e.g. "T2 19:00-21:00, T5 18:00-20:00" or just "T2, T5" with no time — missing times
     // fall back to a 19:00, 90-minute default slot. Unrecognized segments are skipped rather
@@ -60,14 +72,15 @@ public static class SessionScheduling
         return slots;
     }
 
-    // Monday of the week AFTER the current one, at UTC midnight — "tuần sau" from whenever
-    // the request is accepted, regardless of what day of the week that happens to be.
+    // Monday of the week AFTER the current one (00:00 Vietnam time, converted to its true UTC
+    // instant) — "tuần sau" from whenever the request is accepted, regardless of what day of
+    // the week that happens to be. `now` must be UTC (e.g. DateTime.UtcNow).
     public static DateTime NextWeekMonday(DateTime now)
     {
-        var today = DateOnly.FromDateTime(now);
-        var daysSinceMonday = ((int)today.DayOfWeek + 6) % 7; // Monday=0 .. Sunday=6
-        var thisWeekMonday = today.AddDays(-daysSinceMonday);
-        return thisWeekMonday.AddDays(7).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var todayVn = DateOnly.FromDateTime(now + VietnamOffset);
+        var daysSinceMonday = ((int)todayVn.DayOfWeek + 6) % 7; // Monday=0 .. Sunday=6
+        var thisWeekMonday = todayVn.AddDays(-daysSinceMonday);
+        return VietnamToUtc(thisWeekMonday.AddDays(7).ToDateTime(TimeOnly.MinValue));
     }
 
     // ~4.33 weeks/month (52 weeks / 12 months); at least 1 week. Used to size the session
@@ -80,7 +93,8 @@ public static class SessionScheduling
 
     // Walk the calendar forward from startDate. For every day that matches a configured
     // weeklySlots entry, emit one session per slot (ordered by start time) until `total`
-    // sessions are placed.
+    // sessions are placed. `slot.StartTime`/`EndTime` are Vietnam-local clock times (what the
+    // user picked); StartAt/EndAt are converted to their true UTC instant for storage.
     public static List<Session> BuildPlaceholderSessions(
         Guid classId, ClassFormat format, DateTime startDate, List<ClassScheduleSlot> weeklySlots, int total, DateTime now)
     {
@@ -91,7 +105,9 @@ public static class SessionScheduling
             .GroupBy(s => s.DayOfWeek)
             .ToDictionary(g => g.Key, g => g.OrderBy(s => s.StartTime).ToList());
 
-        var cursor = DateOnly.FromDateTime(startDate);
+        // Walk in Vietnam-local calendar days so DayOfWeek matching lines up with the days the
+        // user actually configured (startDate may be a UTC instant near a Vietnam day boundary).
+        var cursor = DateOnly.FromDateTime(startDate + VietnamOffset);
         // Worst case: 1 session/week -> total weeks. Cap walk at total*7 + 7 days as a safety net.
         var maxDaysToWalk = (total * 7) + 7;
 
@@ -108,8 +124,8 @@ public static class SessionScheduling
                 {
                     SessionID = Guid.NewGuid(),
                     ClassID = classId,
-                    StartAt = date.ToDateTime(slot.StartTime, DateTimeKind.Utc),
-                    EndAt = date.ToDateTime(slot.EndTime, DateTimeKind.Utc),
+                    StartAt = VietnamToUtc(date.ToDateTime(slot.StartTime)),
+                    EndAt = VietnamToUtc(date.ToDateTime(slot.EndTime)),
                     Status = SessionStatus.Scheduled,
                     Format = format,
                     CreatedAt = now
