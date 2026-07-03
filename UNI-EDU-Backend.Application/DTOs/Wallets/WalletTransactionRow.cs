@@ -11,4 +11,5 @@ public record WalletTransactionRow(
     string Description,
     DateTime CreatedAt,
     Guid? RelatedClassId,
-    Guid? ChildId);
+    Guid? ChildId,
+    WalletTxStatus Status);

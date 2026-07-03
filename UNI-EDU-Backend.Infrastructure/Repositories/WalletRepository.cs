@@ -47,7 +47,8 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
                 t.CreatedAt,
                 t.RelatedClassID,
                 // LEFT JOIN to the related class for the parent-view childId.
-                t.Class != null ? t.Class.StudentID : null))
+                t.Class != null ? t.Class.StudentID : null,
+                t.Status))
             .ToListAsync(cancellationToken);
 
         return (items, total);

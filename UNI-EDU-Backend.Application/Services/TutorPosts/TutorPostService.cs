@@ -25,8 +25,8 @@ public class TutorPostService(
         await _repo.CreateAsync(tutorId, request, cancellationToken);
     }
 
-    public Task<PagedResult<TutorPostResponse>> GetOpenAsync(TutorPostListQuery query, CancellationToken cancellationToken) =>
-        _repo.GetOpenAsync(query, PageSize, cancellationToken);
+    public Task<PagedResult<TutorPostResponse>> GetOpenAsync(TutorPostListQuery query, Guid callerId, CancellationToken cancellationToken) =>
+        _repo.GetOpenAsync(query, PageSize, callerId, cancellationToken);
 
     public Task<List<TutorPostResponse>> GetMineAsync(Guid tutorId, CancellationToken cancellationToken) =>
         _repo.GetMineAsync(tutorId, cancellationToken);
@@ -71,6 +71,9 @@ public class TutorPostService(
 
         if (app.Status != "pending")
             throw new BadRequestException("Đăng ký này đã được xử lý.");
+
+        if (app.PostStatus != "open")
+            throw new BadRequestException("Tin đăng này đã đóng — không thể nhận thêm học sinh.");
 
         if (!await _aiTestRepo.ConsumeIfPassedAsync(request.AiTestAttemptId, tutorId, app.SubjectId, cancellationToken))
             throw new BadRequestException("Bạn cần làm và ĐẠT bài test AI (≥80%) cho đúng môn trước khi nhận học sinh.");

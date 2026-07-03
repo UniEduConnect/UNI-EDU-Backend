@@ -30,6 +30,22 @@ public class RefundsController(IRefundService refundService) : ControllerBase
         });
     }
 
+    // A tutor's own refund history — refunds raised on classes they teach.
+    [HttpGet("/api/me/refunds")]
+    [Authorize(Roles = "Tutor")]
+    public async Task<IActionResult> GetMine([FromQuery] RefundListQuery query, CancellationToken cancellationToken)
+    {
+        var (userId, _) = ReadCallerOrThrow();
+        PagedResult<RefundResponse> result = await _refundService.GetForTutorAsync(userId, query, cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<PagedResult<RefundResponse>>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Get my refunds successfully",
+            Data = result
+        });
+    }
+
     // Finance portal (Admin role).
     [HttpGet("/api/Finance/refunds")]
     [Authorize(Roles = "Admin")]

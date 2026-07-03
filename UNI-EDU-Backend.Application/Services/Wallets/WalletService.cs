@@ -74,7 +74,8 @@ public class WalletService(
                 Amount = r.Amount,
                 Description = r.Description,
                 Date = r.CreatedAt.ToString("yyyy-MM-dd"),
-                Status = "completed"
+                // Real settlement state: pending | completed | failed (was hardcoded "completed").
+                Status = r.Status.ToString().ToLowerInvariant()
             };
 
             // Superset: each role carries only its own related-id field.

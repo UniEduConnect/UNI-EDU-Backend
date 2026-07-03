@@ -15,6 +15,9 @@ public interface IRefundRepository
 
     Task<(List<RefundResponse> Items, int Total)> GetAllAsync(RefundStatus? status, int page, int pageSize, CancellationToken cancellationToken);
 
+    // Refunds raised on classes owned by a given tutor (tutor's own refund history).
+    Task<(List<RefundResponse> Items, int Total)> GetForTutorAsync(Guid tutorId, RefundStatus? status, int page, int pageSize, CancellationToken cancellationToken);
+
     // Approve: move the refunded amount from the student's held escrow back to spendable balance.
     Task<RefundReviewResult> ApproveAsync(Guid refundId, Guid reviewerId, string? note, CancellationToken cancellationToken);
     Task<RefundReviewResult> RejectAsync(Guid refundId, Guid reviewerId, string? note, CancellationToken cancellationToken);

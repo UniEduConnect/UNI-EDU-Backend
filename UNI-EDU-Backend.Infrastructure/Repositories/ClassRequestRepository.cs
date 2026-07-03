@@ -23,6 +23,7 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
             Grade = request.Grade,
             PreferredSchedule = request.PreferredSchedule,
             Budget = request.Budget,
+            DurationMonths = request.DurationMonths,
             Note = request.Note,
             Status = "open",
             CreatedAt = DateTime.UtcNow
@@ -71,44 +72,63 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
         return row is null ? null : (row.Status, row.StudentId, row.SubjectId);
     }
 
-    public async Task AssignAsync(Guid requestId, Guid tutorId, CancellationToken cancellationToken)
+    public async Task<Guid> AssignAsync(Guid requestId, Guid tutorId, CancellationToken cancellationToken)
     {
         var req = await _dbContext.Set<ClassRequest>().FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
-        if (req is null) return;
+        if (req is null) return Guid.Empty;
 
         req.Status = "assigned";
         req.AssignedTutorId = tutorId;
         req.AssignedAt = DateTime.UtcNow;
 
         // Materialize a real Class so the match shows up in everyone's class list
-        // (tutor / student / parent). No escrow — fee/schedule are arranged later.
+        // (tutor / student / parent). No escrow — fee is arranged later.
         var subjectName = await _dbContext.Subjects.AsNoTracking()
             .Where(s => s.SubjectID == req.SubjectId)
             .Select(s => s.SubjectName)
             .FirstOrDefaultAsync(cancellationToken) ?? "Lớp học";
 
-        _dbContext.Classes.Add(new Class
+        var now = DateTime.UtcNow;
+        var classId = Guid.NewGuid();
+
+        // Build the timetable from the student's requested schedule (e.g. "T2 19:00-21:00,
+        // T5 18:00-20:00"): the class starts on the Monday of NEXT week, and we pre-generate
+        // Session rows to cover the requested minimum commitment (DurationMonths).
+        var weeklySlots = SessionScheduling.ParsePreferredSchedule(req.PreferredSchedule);
+        var startDate = SessionScheduling.NextWeekMonday(now);
+        var totalSessions = weeklySlots.Count > 0
+            ? weeklySlots.Count * SessionScheduling.WeeksForDuration(req.DurationMonths)
+            : 0;
+
+        var classRow = new Class
         {
-            ClassID = Guid.NewGuid(),
+            ClassID = classId,
             TutorID = tutorId,
             StudentID = req.StudentId,
             SubjectID = req.SubjectId,
             Name = $"Lớp {subjectName}",
-            StartDate = DateTime.UtcNow,
+            StartDate = startDate,
             TuitionFee = req.Budget ?? 0,
             Status = ClassStatus.Active,
             Format = ClassFormat.Online,
-            WeeklySlots = new(),
-            TotalSessions = 0,
+            WeeklySlots = weeklySlots,
+            TotalSessions = totalSessions,
             CompletedSessions = 0,
             EscrowAmount = 0,
             EscrowReleased = 0,
             EscrowStatus = EscrowStatus.Pending,
             ReleaseMilestone = 0,
-            CreatedAt = DateTime.UtcNow
-        });
+            CreatedAt = now
+        };
+
+        var sessions = SessionScheduling.BuildPlaceholderSessions(
+            classId, classRow.Format, startDate, weeklySlots, totalSessions, now);
+
+        _dbContext.Classes.Add(classRow);
+        _dbContext.Sessions.AddRange(sessions);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        return classId;
     }
 
     // Expression (not a method) so EF Core translates it to a SQL projection with
@@ -125,6 +145,7 @@ public class ClassRequestRepository(ApplicationDbContext dbContext) : IClassRequ
         Subject = r.Subject.SubjectName,
         PreferredSchedule = r.PreferredSchedule,
         Budget = r.Budget,
+        DurationMonths = r.DurationMonths,
         Note = r.Note,
         Status = r.Status,
         AssignedTutorName = null,

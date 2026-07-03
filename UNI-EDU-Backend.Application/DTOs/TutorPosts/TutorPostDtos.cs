@@ -9,6 +9,8 @@ public class CreateTutorPostRequest
     public string? GradeLevels { get; set; }
     public int? HourlyRate { get; set; }
     public string? PreferredSchedule { get; set; }
+    // Minimum teaching commitment in months (>= 3).
+    public int? DurationMonths { get; set; }
     public string? Note { get; set; }
 }
 
@@ -17,6 +19,9 @@ public class CreateTutorPostValidator : AbstractValidator<CreateTutorPostRequest
     public CreateTutorPostValidator()
     {
         RuleFor(x => x.SubjectId).NotEmpty().WithMessage("Vui lòng chọn môn học.");
+        RuleFor(x => x.DurationMonths)
+            .NotNull().WithMessage("Vui lòng nhập thời lượng dạy.")
+            .GreaterThanOrEqualTo(3).WithMessage("Thời lượng dạy tối thiểu là 3 tháng.");
     }
 }
 
@@ -32,9 +37,14 @@ public class TutorPostResponse
     public string? GradeLevels { get; set; }
     public int? HourlyRate { get; set; }
     public string? PreferredSchedule { get; set; }
+    public int? DurationMonths { get; set; }
     public string? Note { get; set; }
     public string Status { get; set; } = "open";
     public DateTime CreatedAt { get; set; }
+
+    // True when the caller (a Student) has a pending "đăng ký học" application on this post.
+    // Always false for Parent callers, since applications are keyed by StudentId.
+    public bool HasPendingApplication { get; set; }
 }
 
 public class TutorPostListQuery

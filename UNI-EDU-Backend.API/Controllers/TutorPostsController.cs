@@ -34,7 +34,7 @@ public class TutorPostsController(ITutorPostService service) : ControllerBase
     [Authorize(Roles = "Student,Parent")]
     public async Task<IActionResult> GetOpen([FromQuery] TutorPostListQuery query, CancellationToken cancellationToken)
     {
-        PagedResult<TutorPostResponse> result = await _service.GetOpenAsync(query, cancellationToken);
+        PagedResult<TutorPostResponse> result = await _service.GetOpenAsync(query, ReadCallerIdOrThrow(), cancellationToken);
         return StatusCode(StatusCodes.Status200OK, new ApiResponse<PagedResult<TutorPostResponse>>
         {
             StatusCode = StatusCodes.Status200OK,

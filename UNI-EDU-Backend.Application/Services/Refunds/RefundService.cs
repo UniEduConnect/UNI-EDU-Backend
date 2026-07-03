@@ -52,6 +52,14 @@ public class RefundService(
         return new PagedResult<RefundResponse> { Items = items, Total = total, Page = page, PageSize = PageSize };
     }
 
+    public async Task<PagedResult<RefundResponse>> GetForTutorAsync(Guid tutorId, RefundListQuery query, CancellationToken cancellationToken)
+    {
+        var page = query.Page < 1 ? 1 : query.Page;
+        var (items, total) = await _refundRepo.GetForTutorAsync(tutorId, ParseStatus(query.Status), page, PageSize, cancellationToken);
+
+        return new PagedResult<RefundResponse> { Items = items, Total = total, Page = page, PageSize = PageSize };
+    }
+
     public async Task ApproveAsync(Guid refundId, ReviewRefundRequest request, Guid reviewerId, CancellationToken cancellationToken)
     {
         var result = await _refundRepo.ApproveAsync(refundId, reviewerId, request.Note, cancellationToken);

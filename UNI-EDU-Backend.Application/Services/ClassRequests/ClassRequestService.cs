@@ -57,14 +57,16 @@ public class ClassRequestService(
         if (!await _aiTestRepo.ConsumeIfPassedAsync(request.AiTestAttemptId, tutorId, info.SubjectId, cancellationToken))
             throw new BadRequestException("Bạn cần làm và ĐẠT bài test AI (≥80%) cho đúng môn của lớp này trước khi nhận. Mỗi lần nhận lớp cần một bài test riêng.");
 
-        await _repo.AssignAsync(requestId, tutorId, cancellationToken);
+        var classId = await _repo.AssignAsync(requestId, tutorId, cancellationToken);
 
+        // Deep-link the notification straight to the newly created class detail.
+        var link = classId == Guid.Empty ? "/student/classes" : $"/student/classes/{classId}";
         await _notificationRepo.CreateAsync(
             info.StudentId,
             "Gia sư đã nhận lớp",
             "Một gia sư đã nhận yêu cầu tìm gia sư của bạn. Hệ thống sẽ kết nối hai bên.",
             "success",
-            "/student",
+            link,
             cancellationToken);
     }
 }

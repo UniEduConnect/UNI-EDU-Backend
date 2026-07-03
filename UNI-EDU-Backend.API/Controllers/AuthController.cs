@@ -110,13 +110,9 @@ namespace UNI_EDU_Backend.API.Controllers
         [Route("api/logout")]
         public async Task<IActionResult> LogoutAsync()
         {
-            Response.Cookies.Append("refreshToken", "", new CookieOptions
-            {
-                Expires = DateTime.UtcNow.AddDays(-1),
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict
-            });
+            // Must use the same CookieOptions that set the cookie (see
+            // AuthService.BuildRefreshTokenCookieOptions) or the browser won't clear it.
+            _authService.ClearRefreshTokenCookie();
 
             return Ok(new ApiResponse<object>
             {
