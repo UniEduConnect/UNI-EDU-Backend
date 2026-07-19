@@ -9,7 +9,7 @@ public class CreateTutorPostRequest
     public string? GradeLevels { get; set; }
     public int? HourlyRate { get; set; }
     public string? PreferredSchedule { get; set; }
-    // Minimum teaching commitment in months (>= 3).
+    // Minimum teaching commitment in months (>= 1).
     public int? DurationMonths { get; set; }
     public string? Note { get; set; }
 }
@@ -21,7 +21,7 @@ public class CreateTutorPostValidator : AbstractValidator<CreateTutorPostRequest
         RuleFor(x => x.SubjectId).NotEmpty().WithMessage("Vui lòng chọn môn học.");
         RuleFor(x => x.DurationMonths)
             .NotNull().WithMessage("Vui lòng nhập thời lượng dạy.")
-            .GreaterThanOrEqualTo(3).WithMessage("Thời lượng dạy tối thiểu là 3 tháng.");
+            .GreaterThanOrEqualTo(1).WithMessage("Thời lượng dạy tối thiểu là 1 tháng.");
     }
 }
 

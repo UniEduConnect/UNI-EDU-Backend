@@ -9,7 +9,7 @@ public class CreateClassRequestRequest
     public int Grade { get; set; }
     public string? PreferredSchedule { get; set; }
     public int? Budget { get; set; }
-    // Minimum learning commitment in months (>= 3).
+    // Minimum learning commitment in months (>= 1).
     public int? DurationMonths { get; set; }
     public string? Note { get; set; }
 
@@ -25,7 +25,7 @@ public class CreateClassRequestValidator : AbstractValidator<CreateClassRequestR
         RuleFor(x => x.Grade).InclusiveBetween(1, 12).WithMessage("Lớp không hợp lệ.");
         RuleFor(x => x.DurationMonths)
             .NotNull().WithMessage("Vui lòng nhập thời lượng học.")
-            .GreaterThanOrEqualTo(3).WithMessage("Thời lượng học tối thiểu là 3 tháng.");
+            .GreaterThanOrEqualTo(1).WithMessage("Thời lượng học tối thiểu là 1 tháng.");
     }
 }
 
