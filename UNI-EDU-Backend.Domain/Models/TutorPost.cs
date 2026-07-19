@@ -14,7 +14,7 @@ namespace UNI_EDU_Backend.Domain.Models
         public string? GradeLevels { get; set; }      // e.g. "Lớp 10-12"
         public int? HourlyRate { get; set; }
         public string? PreferredSchedule { get; set; }
-        // Minimum teaching commitment in months (>= 3), mirroring ClassRequest.DurationMonths.
+        // Minimum teaching commitment in months (>= 1), mirroring ClassRequest.DurationMonths.
         public int? DurationMonths { get; set; }
         public string? Note { get; set; }
 

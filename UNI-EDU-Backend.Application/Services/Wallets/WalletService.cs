@@ -249,7 +249,7 @@ public class WalletService(
 
         var amount = Math.Truncate(request.Amount);
         var orderId = $"DEP-TEST-{Guid.NewGuid():N}";
-        const string orderInfo = "Nap tien vao vi UNI-EDU (TEST)";
+        const string orderInfo = "Nap tien vao vi UNI-EDU";
 
         var transactionId = await _walletRepo.CreatePendingDepositAsync(
             callerUserId, amount, TestMethod, orderId, orderInfo, cancellationToken);
