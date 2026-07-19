@@ -36,7 +36,15 @@
         { "name": "Ai__BaseUrl", "value": "https://openrouter.ai/api/v1" },
         { "name": "Ai__OpenAiModel", "value": "deepseek/deepseek-chat" },
         { "name": "S3__BucketName", "value": "uni-bucket-name" },
-        { "name": "S3__Region", "value": "ap-southeast-1" }
+        { "name": "S3__Region", "value": "ap-southeast-1" },
+        {
+          "name": "VnPay__PayUrl",
+          "value": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+        },
+        {
+          "name": "VnPay__ReturnUrl",
+          "value": "https://unieducation.net/wallet/deposit-return"
+        }
       ],
       "secrets": [
         {
@@ -70,6 +78,14 @@
         {
           "name": "OPENAI_API_KEY",
           "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/OPENAI_API_KEY"
+        },
+        {
+          "name": "VnPay__TmnCode",
+          "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/VnPay__TmnCode"
+        },
+        {
+          "name": "VnPay__HashSecret",
+          "valueFrom": "arn:aws:ssm:ap-southeast-1:164733187525:parameter/uni-edu/VnPay__HashSecret"
         }
       ],
       "logConfiguration": {
