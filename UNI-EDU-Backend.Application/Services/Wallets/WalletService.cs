@@ -249,7 +249,10 @@ public class WalletService(
 
         var amount = Math.Truncate(request.Amount);
         var orderId = $"DEP-TEST-{Guid.NewGuid():N}";
-        const string orderInfo = "Nap tien vao vi UNI-EDU";
+        // orderInfo becomes the transaction Description; append the transfer memo
+        // (e.g. "UNIEDU NAP A1B2C3") so it shows as the transaction content.
+        const string baseInfo = "Nap tien vao vi UNI-EDU";
+        var orderInfo = string.IsNullOrWhiteSpace(request.Note) ? baseInfo : $"{baseInfo} • {request.Note}";
 
         var transactionId = await _walletRepo.CreatePendingDepositAsync(
             callerUserId, amount, TestMethod, orderId, orderInfo, cancellationToken);

@@ -54,7 +54,11 @@ public class WithdrawalRepository(ApplicationDbContext dbContext) : IWithdrawalR
             Amount = -request.Amount,
             Status = WalletTxStatus.Pending,
             Method = method,
-            Description = $"Rút tiền về {request.BankName} ({request.BankAccount})",
+            // Append the transfer memo (e.g. "UNIEDU RUT A1B2C3") so it shows as the
+            // transaction content in every history/detail view.
+            Description = string.IsNullOrWhiteSpace(request.Note)
+                ? $"Rút tiền về {request.BankName} ({request.BankAccount})"
+                : $"Rút tiền về {request.BankName} ({request.BankAccount}) • {request.Note}",
             CreatedAt = now
         };
         withdrawal.LedgerTransactionId = ledgerTx.TransactionID;
