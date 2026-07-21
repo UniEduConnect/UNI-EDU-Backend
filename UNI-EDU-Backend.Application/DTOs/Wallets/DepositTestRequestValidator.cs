@@ -13,5 +13,10 @@ public class DepositTestRequestValidator : AbstractValidator<DepositTestRequest>
         RuleFor(x => x.Amount)
             .GreaterThanOrEqualTo(MinAmount).WithMessage($"amount must be at least {MinAmount:N0} VND.")
             .LessThanOrEqualTo(MaxAmount).WithMessage($"amount must not exceed {MaxAmount:N0} VND.");
+
+        When(x => x.Note is not null, () =>
+        {
+            RuleFor(x => x.Note!).MaximumLength(200);
+        });
     }
 }

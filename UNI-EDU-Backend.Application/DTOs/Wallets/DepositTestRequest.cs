@@ -5,4 +5,8 @@ namespace UNI_EDU_Backend.Application.DTOs.Wallets;
 public class DepositTestRequest
 {
     public decimal Amount { get; set; }
+
+    // Optional bank-transfer memo (e.g. "UNIEDU NAP A1B2C3") — appended to the transaction
+    // description so it shows as the transaction content in history/detail views.
+    public string? Note { get; set; }
 }
