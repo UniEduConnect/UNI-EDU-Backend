@@ -5,6 +5,7 @@ using UNI_EDU_Backend.Application.Exceptions;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Enums;
 using UNI_EDU_Backend.Domain.Models;
+using UNI_EDU_Backend.Infrastructure.Common;
 
 namespace UNI_EDU_Backend.Infrastructure.Repositories;
 
@@ -92,6 +93,10 @@ public class ClassRepository(ApplicationDbContext dbContext) : IClassRepository
         };
 
         var sessions = BuildPlaceholderSessions(classRow, request.TotalSessions, now);
+
+        // Reject the booking if any generated session clashes with an existing one for this
+        // tutor or student (checked inside the open transaction, before persisting).
+        await ScheduleConflict.EnsureNoConflictAsync(_dbContext, request.TutorId, request.StudentId, sessions, cancellationToken);
 
         _dbContext.Classes.Add(classRow);
         _dbContext.WalletTransactions.Add(escrowTx);

@@ -30,4 +30,9 @@ public interface ITutorPostRepository
     // Accepts the application, materializes the Class, and closes the post — a post is a
     // single "slot"; once it's matched into a class it drops off everyone's open-posts list.
     Task AcceptApplicationAsync(Guid appId, CancellationToken cancellationToken);
+
+    // Read-only pre-check mirroring AcceptApplicationAsync: throws if the application can't be accepted
+    // (not pending, not the caller's, schedule clash, or the student's wallet can't cover the tuition)
+    // — WITHOUT writing anything or consuming a test. Gates the AI test before a tutor wastes it.
+    Task EnsureApplicationAcceptableAsync(Guid tutorId, Guid appId, CancellationToken cancellationToken);
 }

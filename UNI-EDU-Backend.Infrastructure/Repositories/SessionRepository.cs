@@ -255,10 +255,17 @@ public class SessionRepository(ApplicationDbContext dbContext) : ISessionReposit
             Format = format,
             CreatedAt = DateTime.UtcNow,
         };
-        _dbContext.Sessions.Add(session);
 
         // Keep the class's planned-session count in sync so progress bars stay correct.
         var classRow = await _dbContext.Classes.FirstOrDefaultAsync(c => c.ClassID == classId, cancellationToken);
+
+        // Reject a manually-added session that clashes with any existing session of this class's
+        // tutor or student (double-booking guard).
+        if (classRow is not null)
+            await Common.ScheduleConflict.EnsureNoConflictAsync(
+                _dbContext, classRow.TutorID, classRow.StudentID, new[] { session }, cancellationToken);
+
+        _dbContext.Sessions.Add(session);
         if (classRow is not null) classRow.TotalSessions += 1;
 
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -2,9 +2,11 @@ using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using UNI_EDU_Backend.Application.Commons;
 using UNI_EDU_Backend.Application.DTOs.TutorPosts;
+using UNI_EDU_Backend.Application.Exceptions;
 using UNI_EDU_Backend.Application.Interfaces.Repositories;
 using UNI_EDU_Backend.Domain.Enums;
 using UNI_EDU_Backend.Domain.Models;
+using UNI_EDU_Backend.Infrastructure.Common;
 
 namespace UNI_EDU_Backend.Infrastructure.Repositories;
 
@@ -14,6 +16,12 @@ public class TutorPostRepository(ApplicationDbContext dbContext) : ITutorPostRep
 
     public async Task CreateAsync(Guid tutorId, CreateTutorPostRequest request, CancellationToken cancellationToken)
     {
+        // Validate at submit time: the tutor's advertised schedule must not clash with itself or
+        // with a class they're already teaching — so a conflict surfaces now, not only if/when a
+        // student registers and the tutor accepts.
+        await ScheduleConflict.EnsureRequestedScheduleFreeAsync(
+            _dbContext, tutorId, isTutor: true, request.PreferredSchedule, request.DurationMonths, cancellationToken);
+
         _dbContext.Set<TutorPost>().Add(new TutorPost
         {
             Id = Guid.NewGuid(),
@@ -156,19 +164,28 @@ public class TutorPostRepository(ApplicationDbContext dbContext) : ITutorPostRep
     {
         await using var tx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        var app = await _dbContext.Set<TutorPostApplication>().FirstOrDefaultAsync(a => a.Id == appId, cancellationToken);
+        var now = DateTime.UtcNow;
+
+        // Atomically claim the application — the WHERE Status == "pending" + row lock means only ONE
+        // of two concurrent accepts flips it and proceeds to charge the wallet; the loser updates 0
+        // rows and bails before any money moves.
+        var claimed = await _dbContext.Set<TutorPostApplication>()
+            .Where(a => a.Id == appId && a.Status == "pending")
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(a => a.Status, "accepted")
+                .SetProperty(a => a.RespondedAt, now), cancellationToken);
+        if (claimed == 0) return; // already processed by a concurrent accept
+
+        var app = await _dbContext.Set<TutorPostApplication>().AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == appId, cancellationToken);
         if (app is null) return;
-        app.Status = "accepted";
-        app.RespondedAt = DateTime.UtcNow;
 
         // Materialize a real Class so the match shows up in everyone's class list.
-        // No escrow — fee is arranged later between tutor and student.
         var post = await _dbContext.Set<TutorPost>().AsNoTracking()
             .Where(p => p.Id == app.TutorPostId)
             .Select(p => new { p.HourlyRate, p.PreferredSchedule, p.DurationMonths, SubjectName = p.Subject.SubjectName })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var now = DateTime.UtcNow;
         var classId = Guid.NewGuid();
 
         // Same timetable treatment as ClassRequestRepository.AssignAsync: parse the tutor's
@@ -181,6 +198,16 @@ public class TutorPostRepository(ApplicationDbContext dbContext) : ITutorPostRep
             ? weeklySlots.Count * SessionScheduling.WeeksForDuration(post?.DurationMonths)
             : 0;
 
+        var sessions = SessionScheduling.BuildPlaceholderSessions(
+            classId, ClassFormat.Online, startDate, weeklySlots, totalSessions, now);
+
+        // HourlyRate is a per-HOUR price (FE label "Học phí mỗi giờ"), and sessions aren't all one
+        // hour — so tuition is priced on actual teaching hours: rate × Σ session durations. Storing
+        // that as EscrowAmount keeps the even per-session release (EscrowAmount / TotalSessions)
+        // equal to the tutor's true hourly rate for uniform-length sessions.
+        var totalHours = (decimal)sessions.Sum(s => (s.EndAt - s.StartAt).TotalHours);
+        var totalTuition = (post?.HourlyRate ?? 0) * totalHours;
+
         var classRow = new Class
         {
             ClassID = classId,
@@ -189,21 +216,24 @@ public class TutorPostRepository(ApplicationDbContext dbContext) : ITutorPostRep
             SubjectID = app.SubjectId,
             Name = $"Lớp {post?.SubjectName ?? "học"}",
             StartDate = startDate,
-            TuitionFee = post?.HourlyRate ?? 0,
+            // TuitionFee mirrors EscrowAmount (class total) — the codebase-wide convention.
+            TuitionFee = totalTuition,
             Status = ClassStatus.Active,
             Format = ClassFormat.Online,
             WeeklySlots = weeklySlots,
             TotalSessions = totalSessions,
             CompletedSessions = 0,
-            EscrowAmount = 0,
+            EscrowAmount = totalTuition,
             EscrowReleased = 0,
             EscrowStatus = EscrowStatus.Pending,
             ReleaseMilestone = 0,
             CreatedAt = now
         };
 
-        var sessions = SessionScheduling.BuildPlaceholderSessions(
-            classId, classRow.Format, startDate, weeklySlots, totalSessions, now);
+        // Block double-booking, then charge the student — both before any write; a clashing slot
+        // or an underfunded wallet aborts the accept (the surrounding transaction rolls back).
+        await ScheduleConflict.EnsureNoConflictAsync(_dbContext, app.TutorId, app.StudentId, sessions, cancellationToken);
+        await ClassEscrow.ChargeStudentAsync(_dbContext, app.StudentId, classId, classRow.Name, totalTuition, now, cancellationToken);
 
         _dbContext.Classes.Add(classRow);
         _dbContext.Sessions.AddRange(sessions);
@@ -217,6 +247,47 @@ public class TutorPostRepository(ApplicationDbContext dbContext) : ITutorPostRep
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, "closed"), cancellationToken);
 
         await tx.CommitAsync(cancellationToken);
+    }
+
+    // Read-only pre-check: reproduces AcceptApplicationAsync's would-be timetable + tuition EXACTLY,
+    // then runs the same conflict + affordability guards WITHOUT any write, status change, or test
+    // consumption. Keep the session/tuition build byte-for-byte identical to AcceptApplicationAsync.
+    public async Task EnsureApplicationAcceptableAsync(Guid tutorId, Guid appId, CancellationToken cancellationToken)
+    {
+        var app = await _dbContext.Set<TutorPostApplication>().AsNoTracking()
+            .Where(a => a.Id == appId)
+            .Select(a => new { a.Status, a.TutorId, a.StudentId, a.SubjectId, a.TutorPostId })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (app is null)
+            throw new NotFoundException("Không tìm thấy đăng ký.");
+        if (app.Status != "pending")
+            throw new BadRequestException("Đăng ký này đã được xử lý.");
+        if (app.TutorId != tutorId)
+            throw new ForbiddenAccessException("Bạn không có quyền với đăng ký này.");
+
+        var now = DateTime.UtcNow;
+
+        var post = await _dbContext.Set<TutorPost>().AsNoTracking()
+            .Where(p => p.Id == app.TutorPostId)
+            .Select(p => new { p.HourlyRate, p.PreferredSchedule, p.DurationMonths })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var weeklySlots = SessionScheduling.ParsePreferredSchedule(post?.PreferredSchedule);
+        var startDate = SessionScheduling.NextWeekMonday(now);
+        var totalSessions = weeklySlots.Count > 0
+            ? weeklySlots.Count * SessionScheduling.WeeksForDuration(post?.DurationMonths)
+            : 0;
+
+        var sessions = SessionScheduling.BuildPlaceholderSessions(
+            Guid.NewGuid(), ClassFormat.Online, startDate, weeklySlots, totalSessions, now);
+
+        var totalHours = (decimal)sessions.Sum(s => (s.EndAt - s.StartAt).TotalHours);
+        var totalTuition = (post?.HourlyRate ?? 0) * totalHours;
+
+        // Both-party clash guard, then read-only affordability guard — no writes at all.
+        await ScheduleConflict.EnsureNoConflictAsync(_dbContext, app.TutorId, app.StudentId, sessions, cancellationToken);
+        await ClassEscrow.EnsureAffordableAsync(_dbContext, app.StudentId, totalTuition, cancellationToken);
     }
 
     // Expression (not a method) so EF Core translates it to a SQL projection with

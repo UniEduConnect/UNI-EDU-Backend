@@ -45,6 +45,9 @@ public class ClassRequestService(
     public Task<List<ClassRequestResponse>> GetMineAsync(Guid studentId, CancellationToken cancellationToken) =>
         _repo.GetMineAsync(studentId, cancellationToken);
 
+    public Task EnsureAcceptableAsync(Guid tutorId, Guid requestId, CancellationToken cancellationToken) =>
+        _repo.EnsureAcceptableAsync(tutorId, requestId, cancellationToken);
+
     public async Task AcceptAsync(Guid tutorId, Guid requestId, AcceptClassRequestRequest request, CancellationToken cancellationToken)
     {
         var info = await _repo.GetAcceptInfoAsync(requestId, cancellationToken)
