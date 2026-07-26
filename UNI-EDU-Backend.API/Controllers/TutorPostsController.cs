@@ -98,6 +98,21 @@ public class TutorPostsController(ITutorPostService service) : ControllerBase
         });
     }
 
+    // Read-only pre-check the UI calls BEFORE opening the AI test: 200 if the tutor could accept this
+    // application (pending, owned, no schedule clash, student can pay), otherwise the typed exception's status.
+    [HttpGet("applications/{appId:guid}/accept-check")]
+    [Authorize(Roles = "Tutor")]
+    public async Task<IActionResult> AcceptApplicationCheck(Guid appId, CancellationToken cancellationToken)
+    {
+        await _service.EnsureApplicationAcceptableAsync(ReadCallerIdOrThrow(), appId, cancellationToken);
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<object?>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Có thể nhận lớp.",
+            Data = null
+        });
+    }
+
     // Tutor accepts an application after passing an AI test (>=80%) for the post subject.
     [HttpPost("applications/{appId:guid}/accept")]
     [Authorize(Roles = "Tutor")]

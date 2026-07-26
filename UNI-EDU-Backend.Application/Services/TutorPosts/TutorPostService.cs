@@ -64,6 +64,9 @@ public class TutorPostService(
     public Task<List<TutorPostApplicationResponse>> GetApplicationsAsync(Guid tutorId, CancellationToken cancellationToken) =>
         _repo.GetApplicationsForTutorAsync(tutorId, cancellationToken);
 
+    public Task EnsureApplicationAcceptableAsync(Guid tutorId, Guid appId, CancellationToken cancellationToken) =>
+        _repo.EnsureApplicationAcceptableAsync(tutorId, appId, cancellationToken);
+
     public async Task AcceptApplicationAsync(Guid tutorId, Guid appId, AcceptApplicationRequest request, CancellationToken cancellationToken)
     {
         var app = await _repo.GetApplicationForAcceptAsync(appId, tutorId, cancellationToken)

@@ -62,6 +62,21 @@ public class ClassRequestsController(IClassRequestService service) : ControllerB
         });
     }
 
+    // Read-only pre-check the UI calls BEFORE opening the AI test: 200 if the tutor could accept
+    // this request (open, no schedule clash, student can pay), otherwise the typed exception's status.
+    [HttpGet("{id:guid}/accept-check")]
+    [Authorize(Roles = "Tutor")]
+    public async Task<IActionResult> AcceptCheck(Guid id, CancellationToken cancellationToken)
+    {
+        await _service.EnsureAcceptableAsync(ReadCallerIdOrThrow(), id, cancellationToken);
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<object?>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Có thể nhận lớp.",
+            Data = null
+        });
+    }
+
     // Tutor accepts a request — requires a passing tutor-test submission (per acceptance).
     [HttpPost("{id:guid}/accept")]
     [Authorize(Roles = "Tutor")]

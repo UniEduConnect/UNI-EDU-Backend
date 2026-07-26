@@ -16,4 +16,8 @@ public interface ITutorPostService
     Task<List<TutorPostApplicationResponse>> GetApplicationsAsync(Guid tutorId, CancellationToken cancellationToken);
     // Tutor accepts an application after passing an AI test (>=80%) for the post subject.
     Task AcceptApplicationAsync(Guid tutorId, Guid appId, AcceptApplicationRequest request, CancellationToken cancellationToken);
+
+    // Read-only pre-check: can this tutor accept this application (pending, owned, no clash, student
+    // can pay)? Throws the same typed exceptions AcceptApplicationAsync would — runs BEFORE the AI test.
+    Task EnsureApplicationAcceptableAsync(Guid tutorId, Guid appId, CancellationToken cancellationToken);
 }

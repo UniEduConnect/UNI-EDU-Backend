@@ -13,4 +13,8 @@ public interface IClassRequestService
 
     // Tutor accepts a request — gated on passing a tutor-test for this acceptance.
     Task AcceptAsync(Guid tutorId, Guid requestId, AcceptClassRequestRequest request, CancellationToken cancellationToken);
+
+    // Read-only pre-check: can this tutor accept this request (open, no clash, student can pay)?
+    // Throws the same typed exceptions AcceptAsync would — runs BEFORE the tutor takes the AI test.
+    Task EnsureAcceptableAsync(Guid tutorId, Guid requestId, CancellationToken cancellationToken);
 }

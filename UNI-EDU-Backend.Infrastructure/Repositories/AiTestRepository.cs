@@ -93,8 +93,10 @@ public class AiTestRepository(ApplicationDbContext dbContext) : IAiTestRepositor
             .FirstOrDefaultAsync(a => a.Id == attemptId && a.TutorId == tutorId && a.SubjectId == subjectId, cancellationToken);
         if (attempt is null || !attempt.Passed || attempt.Used) return false;
 
+        // Mark used but DO NOT save here: the accept flow (AssignAsync / AcceptApplicationAsync)
+        // persists this together with the class + escrow in one atomic SaveChanges/transaction, so
+        // if that later step throws (insufficient balance / schedule clash) the test isn't burned.
         attempt.Used = true;
-        await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
 }
