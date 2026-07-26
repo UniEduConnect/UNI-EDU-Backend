@@ -71,7 +71,10 @@ public class WalletService(
             {
                 Id = r.TransactionId,
                 Type = MapType(r.Type, role),
-                Amount = r.Amount,
+                // EscrowIn is stored positive (escrow gained), but from the payer's own wallet it's an
+                // OUTFLOW — the tuition leaves their spendable balance into escrow — so surface it as a
+                // negative (debit) transaction. Everything else keeps its stored sign.
+                Amount = r.Type == WalletTxType.EscrowIn ? -Math.Abs(r.Amount) : r.Amount,
                 Description = r.Description,
                 Date = r.CreatedAt.ToString("yyyy-MM-dd"),
                 // Real settlement state: pending | completed | failed (was hardcoded "completed").
