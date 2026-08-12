@@ -29,4 +29,7 @@ public class TransactionResponse
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? PaymentMethod { get; set; }  // not modeled yet — always null
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReceiptUrl { get; set; }
 }

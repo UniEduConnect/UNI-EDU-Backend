@@ -78,7 +78,8 @@ public class WalletService(
                 Description = r.Description,
                 Date = r.CreatedAt.ToString("yyyy-MM-dd"),
                 // Real settlement state: pending | completed | failed (was hardcoded "completed").
-                Status = r.Status.ToString().ToLowerInvariant()
+                Status = r.Status.ToString().ToLowerInvariant(),
+                ReceiptUrl = r.ReceiptUrl
             };
 
             // Superset: each role carries only its own related-id field.
@@ -145,7 +146,7 @@ public class WalletService(
 
         // Idempotent credit — trust Momo's confirmed amount, not anything client-supplied.
         return await _walletRepo.SettleDepositAsync(
-            callback.OrderId, success, callback.TransId.ToString(), callback.Amount, cancellationToken);
+            callback.OrderId, success, callback.TransId.ToString(), callback.Amount, null, cancellationToken);
     }
 
     public async Task<VnPayIpnResponse> HandleVnPayIpnAsync(IReadOnlyDictionary<string, string> vnpFields, string providedHash, CancellationToken cancellationToken)
@@ -168,7 +169,7 @@ public class WalletService(
         // VNPay amount is in subunits (×100). Convert back to whole VND to compare to the stored row.
         var confirmedAmount = amountSubunits / 100m;
 
-        var outcome = await _walletRepo.SettleDepositAsync(orderId, success, transactionNo, confirmedAmount, cancellationToken);
+        var outcome = await _walletRepo.SettleDepositAsync(orderId, success, transactionNo, confirmedAmount, null, cancellationToken);
 
         return outcome switch
         {
@@ -201,7 +202,7 @@ public class WalletService(
         var transactionNo = vnpFields.TryGetValue("vnp_TransactionNo", out var tn) ? tn : string.Empty;
         var confirmedAmount = amountSubunits / 100m;
 
-        var outcome = await _walletRepo.SettleDepositAsync(orderId, success, transactionNo, confirmedAmount, cancellationToken);
+        var outcome = await _walletRepo.SettleDepositAsync(orderId, success, transactionNo, confirmedAmount, null, cancellationToken);
 
         return new VnPayReturnResult
         {
@@ -233,7 +234,7 @@ public class WalletService(
         // PayOS confirms success via top-level success / code "00".
         var success = payload.Success || string.Equals(payload.Code, "00", StringComparison.Ordinal);
 
-        return await _walletRepo.SettleDepositAsync(orderCode, success, providerTxn, amount, cancellationToken);
+        return await _walletRepo.SettleDepositAsync(orderCode, success, providerTxn, amount, null, cancellationToken);
     }
 
     public async Task<WithdrawalResponse> CreateWithdrawalAsync(CreateWithdrawalRequest request, Guid callerUserId, CancellationToken cancellationToken)
@@ -269,7 +270,7 @@ public class WalletService(
         };
     }
 
-    public async Task<TestDepositConfirmResponse> ConfirmTestDepositAsync(Guid transactionId, Guid callerUserId, CancellationToken cancellationToken)
+    public async Task<TestDepositConfirmResponse> ConfirmTestDepositAsync(Guid transactionId, string? receiptUrl, Guid callerUserId, CancellationToken cancellationToken)
     {
         var lookup = await _walletRepo.LookupTestDepositAsync(transactionId, cancellationToken)
             ?? throw new NotFoundException($"Deposit transaction '{transactionId}' not found.");
@@ -286,7 +287,7 @@ public class WalletService(
             throw new BadRequestException($"Deposit is no longer pending (current status: {lookup.Status}).");
 
         var outcome = await _walletRepo.SettleDepositAsync(
-            lookup.OrderId, success: true, providerTxnId: $"MOCK-{Guid.NewGuid():N}", confirmedAmount: lookup.Amount, cancellationToken);
+            lookup.OrderId, success: true, providerTxnId: $"MOCK-{Guid.NewGuid():N}", confirmedAmount: lookup.Amount, receiptUrl, cancellationToken);
 
         if (outcome != DepositSettleOutcome.Credited)
             // Could happen if a concurrent confirm raced us through SettleDepositAsync. Surface

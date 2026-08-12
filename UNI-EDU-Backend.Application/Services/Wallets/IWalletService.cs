@@ -38,5 +38,5 @@ public interface IWalletService
     //     pending, and Method = "test") and credits the wallet. Replaces the IPN step that
     //     would otherwise come from Momo/VNPay.
     Task<DepositResponse> InitiateTestDepositAsync(DepositTestRequest request, Guid callerUserId, CancellationToken cancellationToken);
-    Task<TestDepositConfirmResponse> ConfirmTestDepositAsync(Guid transactionId, Guid callerUserId, CancellationToken cancellationToken);
+    Task<TestDepositConfirmResponse> ConfirmTestDepositAsync(Guid transactionId, string? receiptUrl, Guid callerUserId, CancellationToken cancellationToken);
 }

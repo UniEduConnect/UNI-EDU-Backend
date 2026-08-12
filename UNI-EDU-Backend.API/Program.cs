@@ -164,6 +164,9 @@ var assemblyApplication = typeof(UNI_EDU_Backend.Application.IAssemblyReference)
 builder.Services.AddValidatorsFromAssembly(assemblyApplication);
 
 var envPath = Path.Combine(Directory.GetCurrentDirectory(), "..", ".env");
+if (!File.Exists(envPath))
+    envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+
 if (File.Exists(envPath))
     Env.Load(envPath);
 

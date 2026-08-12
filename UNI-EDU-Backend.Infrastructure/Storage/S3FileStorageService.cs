@@ -33,31 +33,88 @@ public class S3FileStorageService : IFileStorageService
     public async Task<string> UploadAsync(
         Stream content, string fileName, string contentType, string folder, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_o.BucketName))
-            throw new InvalidOperationException("S3 bucket is not configured (set S3:BucketName).");
-
-        // Random key keeps uploads collision-free and avoids leaking the original filename.
-        var ext = Path.GetExtension(fileName);
-        var key = $"{folder.Trim('/')}/{Guid.NewGuid():N}{ext}".TrimStart('/');
-
-        var request = new PutObjectRequest
+        // 1. Try uploading to S3 if BucketName and credentials are configured.
+        if (!string.IsNullOrWhiteSpace(_o.BucketName) && !string.IsNullOrWhiteSpace(_o.AccessKey) && !string.IsNullOrWhiteSpace(_o.SecretKey))
         {
-            BucketName = _o.BucketName,
-            Key = key,
-            InputStream = content,
-            ContentType = contentType,
-            // No per-object ACL — modern buckets block ACLs; expose objects via a
-            // bucket policy or CloudFront instead.
-            DisablePayloadSigning = false,
-        };
+            try
+            {
+                var ext = Path.GetExtension(fileName);
+                var key = $"{folder.Trim('/')}/{Guid.NewGuid():N}{ext}".TrimStart('/');
 
-        await _s3.PutObjectAsync(request, cancellationToken);
-        _logger.LogInformation("Uploaded object {Key} to bucket {Bucket}.", key, _o.BucketName);
+                var request = new PutObjectRequest
+                {
+                    BucketName = _o.BucketName,
+                    Key = key,
+                    InputStream = content,
+                    ContentType = contentType,
+                    DisablePayloadSigning = false,
+                };
 
-        var baseUrl = !string.IsNullOrWhiteSpace(_o.PublicBaseUrl)
-            ? _o.PublicBaseUrl!.TrimEnd('/')
-            : $"https://{_o.BucketName}.s3.{_o.Region}.amazonaws.com";
+                await _s3.PutObjectAsync(request, cancellationToken);
+                _logger.LogInformation("Uploaded object {Key} to S3 bucket {Bucket}.", key, _o.BucketName);
 
-        return $"{baseUrl}/{key}";
+                var baseUrl = !string.IsNullOrWhiteSpace(_o.PublicBaseUrl)
+                    ? _o.PublicBaseUrl!.TrimEnd('/')
+                    : $"https://{_o.BucketName}.s3.{_o.Region}.amazonaws.com";
+
+                return $"{baseUrl}/{key}";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "S3 upload failed. Falling back to local storage.");
+            }
+        }
+        else
+        {
+            _logger.LogInformation("S3 bucket or credentials are not fully configured. Using local storage fallback.");
+        }
+
+        // 2. Fallback to local wwwroot storage (ideal for local development/testing)
+        try
+        {
+            var ext = Path.GetExtension(fileName);
+            var randomName = $"{Guid.NewGuid():N}{ext}";
+
+            // Find physical path of wwwroot dynamically
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var wwwroot = Path.Combine(baseDir, "wwwroot");
+            if (!Directory.Exists(wwwroot))
+            {
+                var candidate = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "wwwroot"));
+                if (Directory.Exists(candidate) || File.Exists(Path.Combine(Path.GetDirectoryName(candidate)!, "Program.cs")))
+                {
+                    wwwroot = candidate;
+                }
+                else
+                {
+                    var relativeCandidate = Path.Combine(Directory.GetCurrentDirectory(), "UNI-EDU-Backend.API", "wwwroot");
+                    if (Directory.Exists(Path.Combine(Directory.GetCurrentDirectory(), "UNI-EDU-Backend.API")))
+                    {
+                        wwwroot = relativeCandidate;
+                    }
+                    else
+                    {
+                        wwwroot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                    }
+                }
+            }
+
+            var uploadDir = Path.Combine(wwwroot, "uploads", folder.Trim('/'));
+            Directory.CreateDirectory(uploadDir);
+
+            var filePath = Path.Combine(uploadDir, randomName);
+            await using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+            {
+                await content.CopyToAsync(fileStream, cancellationToken);
+            }
+
+            _logger.LogInformation("Uploaded file saved locally to {Path}.", filePath);
+            return $"http://localhost:5115/uploads/{folder.Trim('/')}/{randomName}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Local storage fallback failed.");
+            throw new InvalidOperationException("Failed to upload file to both S3 and local storage.", ex);
+        }
     }
 }

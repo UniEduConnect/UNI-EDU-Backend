@@ -25,7 +25,7 @@ namespace UNI_EDU_Backend.Application.Interfaces
         // On success (and matching amount) flips Pending→Completed and credits the balance,
         // all inside one DB transaction. Safe to call repeatedly (webhook retries).
         Task<DepositSettleOutcome> SettleDepositAsync(
-            string orderId, bool success, string providerTxnId, decimal confirmedAmount, CancellationToken cancellationToken);
+            string orderId, bool success, string providerTxnId, decimal confirmedAmount, string? receiptUrl, CancellationToken cancellationToken);
 
         // Tiny lookup used by the mock-confirm flow (POST /wallet/deposit-test/{id}/confirm).
         // Returns null if the transaction id doesn't exist. The service uses this to enforce

@@ -48,7 +48,8 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
                 t.RelatedClassID,
                 // LEFT JOIN to the related class for the parent-view childId.
                 t.Class != null ? t.Class.StudentID : null,
-                t.Status))
+                t.Status,
+                t.ReceiptUrl))
             .ToListAsync(cancellationToken);
 
         return (items, total);
@@ -94,7 +95,7 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
             .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<DepositSettleOutcome> SettleDepositAsync(
-        string orderId, bool success, string providerTxnId, decimal confirmedAmount, CancellationToken cancellationToken)
+        string orderId, bool success, string providerTxnId, decimal confirmedAmount, string? receiptUrl, CancellationToken cancellationToken)
     {
         await using var dbTx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
@@ -109,6 +110,7 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
             return DepositSettleOutcome.AlreadySettled;
 
         tx.ProviderTxnId = providerTxnId;
+        tx.ReceiptUrl = receiptUrl;
 
         if (!success)
         {

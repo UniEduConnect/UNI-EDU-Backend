@@ -40,6 +40,28 @@ public class UploadsController(IFileStorageService storage) : ControllerBase
         });
     }
 
+    [HttpPost("receipt")]
+    [RequestSizeLimit(MaxImageBytes + 1024)]
+    public async Task<IActionResult> UploadReceipt(IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+            throw new BadRequestException("No file was uploaded.");
+        if (file.Length > MaxImageBytes)
+            throw new BadRequestException("Receipt image must be 5 MB or smaller.");
+        if (!AllowedImageTypes.Contains(file.ContentType))
+            throw new BadRequestException("Only JPEG, PNG, WebP or GIF images are allowed.");
+
+        await using var stream = file.OpenReadStream();
+        var url = await _storage.UploadAsync(stream, file.FileName, file.ContentType, "receipts", cancellationToken);
+
+        return StatusCode(StatusCodes.Status200OK, new ApiResponse<UploadResultResponse>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Receipt uploaded successfully",
+            Data = new UploadResultResponse { Url = url }
+        });
+    }
+
     public class UploadResultResponse
     {
         public string Url { get; set; } = string.Empty;

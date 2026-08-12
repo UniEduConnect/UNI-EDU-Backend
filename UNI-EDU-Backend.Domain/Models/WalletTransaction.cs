@@ -29,6 +29,8 @@ namespace UNI_EDU_Backend.Domain.Models
 
         public string Description { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public string? ReceiptUrl { get; set; }
+
 
         public virtual Wallet Wallet { get; set; }
         public virtual Class Class { get; set; }

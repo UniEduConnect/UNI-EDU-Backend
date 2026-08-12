@@ -105,11 +105,11 @@ public class WalletController(IWalletService walletService) : ControllerBase
     // — real Momo/VNPay pending rows still require their signed IPN.
     [HttpPost("deposit-test/{transactionId:guid}/confirm")]
     [Authorize]
-    public async Task<IActionResult> ConfirmDepositTest(Guid transactionId, CancellationToken cancellationToken)
+    public async Task<IActionResult> ConfirmDepositTest(Guid transactionId, [FromBody] ConfirmTestDepositRequest request, CancellationToken cancellationToken)
     {
         var (userId, _) = ReadCallerOrThrow();
 
-        TestDepositConfirmResponse result = await _walletService.ConfirmTestDepositAsync(transactionId, userId, cancellationToken);
+        TestDepositConfirmResponse result = await _walletService.ConfirmTestDepositAsync(transactionId, request.ReceiptUrl, userId, cancellationToken);
 
         ApiResponse<TestDepositConfirmResponse> apiResponse = new()
         {
