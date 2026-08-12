@@ -33,8 +33,8 @@ public class S3FileStorageService : IFileStorageService
     public async Task<string> UploadAsync(
         Stream content, string fileName, string contentType, string folder, CancellationToken cancellationToken)
     {
-        // 1. Try uploading to S3 if BucketName and credentials are configured.
-        if (!string.IsNullOrWhiteSpace(_o.BucketName) && !string.IsNullOrWhiteSpace(_o.AccessKey) && !string.IsNullOrWhiteSpace(_o.SecretKey))
+        // 1. Try uploading to S3 if BucketName is configured.
+        if (!string.IsNullOrWhiteSpace(_o.BucketName))
         {
             try
             {
