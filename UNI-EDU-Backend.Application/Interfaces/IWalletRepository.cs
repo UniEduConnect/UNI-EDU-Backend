@@ -41,5 +41,7 @@ namespace UNI_EDU_Backend.Application.Interfaces
         // records). Returns false if the source wallet is missing or has insufficient balance.
         Task<bool> TransferAsync(
             Guid fromUserId, Guid toUserId, decimal amount, string fromDescription, string toDescription, CancellationToken cancellationToken);
+        // Updates the receipt URL of an existing transaction if it belongs to the user (or any if userId is null).
+        Task UpdateReceiptAsync(Guid transactionId, Guid? userId, string receiptUrl, CancellationToken cancellationToken);
     }
 }

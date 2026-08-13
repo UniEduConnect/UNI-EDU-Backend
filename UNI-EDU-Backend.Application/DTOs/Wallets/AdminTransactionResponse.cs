@@ -20,4 +20,6 @@ public class AdminTransactionResponse
 
     public string Description { get; set; } = string.Empty;
     public DateTime Date { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string? ReceiptUrl { get; set; }
 }
