@@ -10,4 +10,6 @@ public class AdminTransactionListQuery
 
     // 1-based. Default page size is 20 (see FinanceService.TransactionPageSize).
     public int Page { get; set; } = 1;
+
+    public int? PageSize { get; set; }
 }

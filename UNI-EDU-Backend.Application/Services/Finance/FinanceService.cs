@@ -57,18 +57,19 @@ public class FinanceService(
     public async Task<PagedResult<AdminTransactionResponse>> GetTransactionsAsync(AdminTransactionListQuery query, CancellationToken cancellationToken)
     {
         var page = query.Page < 1 ? 1 : query.Page;
+        var pageSize = query.PageSize ?? TransactionPageSize;
 
         var (items, total) = await _walletRepo.GetAllTransactionsAsync(
             query.Type?.Trim().ToLowerInvariant(),
             query.Status?.Trim().ToLowerInvariant(),
-            page, TransactionPageSize, cancellationToken);
+            page, pageSize, cancellationToken);
 
         return new PagedResult<AdminTransactionResponse>
         {
             Items = items,
             Total = total,
             Page = page,
-            PageSize = TransactionPageSize
+            PageSize = pageSize
         };
     }
 
