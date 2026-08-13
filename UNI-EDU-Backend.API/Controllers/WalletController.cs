@@ -200,4 +200,19 @@ public class WalletController(IWalletService walletService) : ControllerBase
 
         return (userId, role);
     }
+
+    [HttpPut("transactions/{id:guid}/receipt")]
+    [Authorize]
+    public async Task<IActionResult> UpdateTransactionReceipt(Guid id, [FromBody] UpdateReceiptRequest request, CancellationToken cancellationToken)
+    {
+        var (userId, role) = ReadCallerOrThrow();
+        Guid? checkUserId = (role == "Finance" || role == "Admin") ? null : userId;
+        await _walletService.UpdateTransactionReceiptAsync(id, checkUserId, request.ReceiptUrl, cancellationToken);
+        return Ok(new ApiResponse<object>
+        {
+            StatusCode = StatusCodes.Status200OK,
+            Message = "Receipt updated successfully.",
+            Data = new { }
+        });
+    }
 }

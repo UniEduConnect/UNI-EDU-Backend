@@ -39,4 +39,5 @@ public interface IWalletService
     //     would otherwise come from Momo/VNPay.
     Task<DepositResponse> InitiateTestDepositAsync(DepositTestRequest request, Guid callerUserId, CancellationToken cancellationToken);
     Task<TestDepositConfirmResponse> ConfirmTestDepositAsync(Guid transactionId, string? receiptUrl, Guid callerUserId, CancellationToken cancellationToken);
+    Task UpdateTransactionReceiptAsync(Guid transactionId, Guid? userId, string receiptUrl, CancellationToken cancellationToken);
 }

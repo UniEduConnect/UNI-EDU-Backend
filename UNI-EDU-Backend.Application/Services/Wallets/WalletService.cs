@@ -296,12 +296,12 @@ public class WalletService(
 
         var balance = await _walletRepo.GetBalanceAsync(callerUserId, cancellationToken);
 
-        return new TestDepositConfirmResponse
-        {
-            TransactionId = transactionId,
-            Status = "completed",
-            Balance = balance
-        };
+        return new TestDepositConfirmResponse { TransactionId = transactionId, Status = "completed", Balance = balance };
+    }
+
+    public async Task UpdateTransactionReceiptAsync(Guid transactionId, Guid? userId, string receiptUrl, CancellationToken cancellationToken)
+    {
+        await _walletRepo.UpdateReceiptAsync(transactionId, userId, receiptUrl, cancellationToken);
     }
 
     // Student/parent call the booking debit "tuition_payment"; the ledger stores it as EscrowIn.

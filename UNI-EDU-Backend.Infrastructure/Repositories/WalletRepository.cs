@@ -192,6 +192,25 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
         return true;
     }
 
+    public async Task UpdateReceiptAsync(Guid transactionId, Guid? userId, string receiptUrl, CancellationToken cancellationToken)
+    {
+        var query = _dbContext.WalletTransactions.Where(x => x.TransactionID == transactionId);
+        if (userId.HasValue)
+        {
+            query = query.Where(x => x.UserID == userId.Value);
+        }
+        
+        var txn = await query.FirstOrDefaultAsync(cancellationToken);
+            
+        if (txn == null)
+        {
+            throw new Exception("Transaction not found or access denied.");
+        }
+
+        txn.ReceiptUrl = receiptUrl;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<(List<AdminTransactionResponse> Items, int Total)> GetAllTransactionsAsync(string? type, string? status, int page, int pageSize, CancellationToken cancellationToken)
     {
         var q = _dbContext.WalletTransactions.AsNoTracking().AsQueryable();
@@ -222,7 +241,8 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
                 x.Amount,
                 x.Status,
                 x.Description,
-                x.CreatedAt
+                x.CreatedAt,
+                x.ReceiptUrl
             })
             .ToListAsync(cancellationToken);
 
@@ -237,7 +257,8 @@ public class WalletRepository(ApplicationDbContext dbContext) : IWalletRepositor
             Amount = x.Amount,
             Status = x.Status.ToString().ToLowerInvariant(),
             Description = x.Description,
-            Date = x.CreatedAt
+            Date = x.CreatedAt,
+            ReceiptUrl = x.ReceiptUrl
         }).ToList();
 
         return (items, total);
